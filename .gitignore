@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.env
+.env.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local source/reference files
+blueprint.docx
+*.mhtml
+~$*.docx
+ChatGPT Image*.png
+ChatGPT_Image*.png
+NamRent Logo.png
