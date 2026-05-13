@@ -12,12 +12,14 @@
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
-    "vite": "latest",
+    "concurrently": "latest",
+    "cors": "latest",
+    "express": "latest",
+    "firebase": "^12.13.0",
+    "leaflet": "^1.9.4",
     "react": "latest",
     "react-dom": "latest",
-    "express": "latest",
-    "cors": "latest",
-    "concurrently": "latest"
-  },
-  "devDependencies": {}
+    "react-leaflet": "^5.0.0",
+    "vite": "latest"
+  }
 }

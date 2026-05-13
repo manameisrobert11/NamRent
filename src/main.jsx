@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
+import GoogleSignIn from "./components/GoogleSignIn.jsx";
+import WindhoekMap from "./components/WindhoekMap.jsx";
 import { listings, locations, futureLocations, propertyTypes, priceRanges } from "./namrentData.js";
 
 const currency = new Intl.NumberFormat("en-NA", {
@@ -9,8 +11,88 @@ const currency = new Intl.NumberFormat("en-NA", {
   maximumFractionDigits: 0,
 });
 
+const emptyVisitProfile = {
+  listingViews: {},
+  locations: {},
+  categories: {},
+  propertyTypes: {},
+  totalPrice: 0,
+  viewCount: 0,
+  recentIds: [],
+};
+
+function getVisitProfileKey(user) {
+  return `namrent-visit-profile:${user?.email ?? "guest"}`;
+}
+
+function readVisitProfile(user) {
+  if (typeof window === "undefined") return emptyVisitProfile;
+  try {
+    return { ...emptyVisitProfile, ...JSON.parse(window.localStorage.getItem(getVisitProfileKey(user)) || "{}") };
+  } catch {
+    return emptyVisitProfile;
+  }
+}
+
+function saveVisitProfile(user, profile) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(getVisitProfileKey(user), JSON.stringify(profile));
+}
+
+function incrementMapValue(map, key) {
+  if (!key) return map;
+  return { ...map, [key]: (map[key] ?? 0) + 1 };
+}
+
+function recordListingVisit(profile, listing) {
+  return {
+    listingViews: incrementMapValue(profile.listingViews, listing.id),
+    locations: incrementMapValue(profile.locations, listing.location),
+    categories: incrementMapValue(profile.categories, listing.category),
+    propertyTypes: incrementMapValue(profile.propertyTypes, listing.propertyType),
+    totalPrice: (profile.totalPrice ?? 0) + Number(listing.price || 0),
+    viewCount: (profile.viewCount ?? 0) + 1,
+    recentIds: [listing.id, ...(profile.recentIds ?? []).filter((id) => id !== listing.id)].slice(0, 20),
+  };
+}
+
+function scoreListingForUser(listing, profile) {
+  const viewCount = profile.viewCount ?? 0;
+  if (!viewCount) return (listing.isFeatured ? 35 : 0) + (listing.popularity ?? 0) * 0.45;
+
+  const averageViewedPrice = (profile.totalPrice ?? 0) / viewCount;
+  const priceGap = Math.abs(Number(listing.price || 0) - averageViewedPrice);
+  const priceFit = Math.max(0, 18 - priceGap / 450);
+  const alreadyViewedPenalty = Math.min(profile.listingViews?.[listing.id] ?? 0, 3) * 6;
+
+  return (
+    (listing.isFeatured ? 22 : 0) +
+    (listing.popularity ?? 0) * 0.3 +
+    (profile.locations?.[listing.location] ?? 0) * 20 +
+    (profile.categories?.[listing.category] ?? 0) * 12 +
+    (profile.propertyTypes?.[listing.propertyType] ?? 0) * 10 +
+    priceFit -
+    alreadyViewedPenalty
+  );
+}
+
+function getPersonalizedFeaturedListings(allListings, profile, limit = 12) {
+  const ranked = [...allListings]
+    .map((listing) => ({ listing, score: scoreListingForUser(listing, profile) }))
+    .sort((a, b) => b.score - a.score || (b.listing.popularity ?? 0) - (a.listing.popularity ?? 0))
+    .map(({ listing }) => listing);
+
+  const featured = allListings.filter((listing) => listing.isFeatured);
+  return [...new Map([...ranked, ...featured].map((listing) => [listing.id, listing])).values()].slice(0, limit);
+}
+
 function App() {
   const [page, setPage] = useState("home");
+  const [currentUser, setCurrentUser] = useState(null);
+  const [platformListings, setPlatformListings] = useState(listings);
+  const [pendingListings, setPendingListings] = useState([]);
+  const [emailNotifications, setEmailNotifications] = useState([]);
+  const [visitProfile, setVisitProfile] = useState(() => readVisitProfile(null));
   const [selectedListingId, setSelectedListingId] = useState(listings[0].id);
   const [filters, setFilters] = useState({
     q: "",
@@ -22,10 +104,10 @@ function App() {
     sort: "newest",
   });
 
-  const selectedListing = listings.find((listing) => listing.id === selectedListingId) ?? listings[0];
+  const selectedListing = platformListings.find((listing) => listing.id === selectedListingId) ?? platformListings[0];
 
   const filteredListings = useMemo(() => {
-    let results = listings.filter((listing) => {
+    let results = platformListings.filter((listing) => {
       const query = filters.q.trim().toLowerCase();
       const matchesQuery =
         !query ||
@@ -47,9 +129,61 @@ function App() {
       results = results.sort((a, b) => Number(b.category === "Student rentals") - Number(a.category === "Student rentals"));
     }
     return results;
-  }, [filters]);
+  }, [filters, platformListings]);
+
+  useEffect(() => {
+    setVisitProfile(readVisitProfile(currentUser));
+  }, [currentUser?.email]);
+
+  const submitListingForApproval = (formListing) => {
+    const pending = {
+      ...formListing,
+      id: `pending-${Date.now()}`,
+      ownerEmail: currentUser?.email ?? formListing.contact.email,
+      ownerName: currentUser?.name ?? formListing.contact.name,
+      status: "pending",
+      submittedAt: new Date().toISOString(),
+    };
+    setPendingListings((current) => [pending, ...current]);
+    return pending;
+  };
+
+  const approveListing = (id) => {
+    const pending = pendingListings.find((listing) => listing.id === id);
+    if (!pending) return;
+    const approved = {
+      ...pending,
+      id: `approved-${Date.now()}`,
+      status: "active",
+      isFeatured: true,
+      popularity: 70,
+      badges: [...new Set([...(pending.badges ?? []), "NamRent Approved"])],
+      approvedAt: new Date().toISOString(),
+    };
+    setPendingListings((current) => current.filter((listing) => listing.id !== id));
+    setPlatformListings((current) => [approved, ...current]);
+    setEmailNotifications((current) => [
+      {
+        id: `email-${Date.now()}`,
+        to: pending.ownerEmail,
+        subject: "Your NamRent listing has been approved",
+        message: `${pending.title} has been approved and is now live on NamRent.`,
+        listingTitle: pending.title,
+        createdAt: new Date().toISOString(),
+      },
+      ...current,
+    ]);
+  };
 
   const goToListing = (id) => {
+    const viewedListing = platformListings.find((listing) => listing.id === id);
+    if (viewedListing) {
+      setVisitProfile((current) => {
+        const updated = recordListingVisit(current, viewedListing);
+        saveVisitProfile(currentUser, updated);
+        return updated;
+      });
+    }
     setSelectedListingId(id);
     setPage("details");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -57,10 +191,15 @@ function App() {
 
   return (
     <>
-      <Header page={page} setPage={setPage} />
+      <Header page={page} setPage={setPage} currentUser={currentUser} setCurrentUser={setCurrentUser} />
       <main>
         {page === "home" && (
           <Home
+            currentUser={currentUser}
+            emailNotifications={emailNotifications}
+            listingsData={platformListings}
+            pendingListings={pendingListings}
+            visitProfile={visitProfile}
             filters={filters}
             setFilters={setFilters}
             setPage={setPage}
@@ -110,12 +249,35 @@ function App() {
           />
         )}
         {page === "details" && <PropertyDetails listing={selectedListing} setPage={setPage} />}
-        {page === "locations" && <LocationsPage setFilters={setFilters} setPage={setPage} />}
+        {page === "locations" && (
+          <LocationsPage
+            listingsData={platformListings}
+            goToListing={goToListing}
+            setFilters={setFilters}
+            setPage={setPage}
+          />
+        )}
         {page === "advertise" && <AdvertisePage />}
         {page === "contact" && <ContactPage />}
-        {page === "login" && <LoginPage />}
-        {page === "dashboard" && <UserDashboard goToListing={goToListing} />}
-        {page === "admin" && <AdminDashboard />}
+        {page === "login" && <LoginPage setUser={setCurrentUser} setPage={setPage} />}
+        {page === "dashboard" && (
+          <UserDashboard
+            currentUser={currentUser}
+            emailNotifications={emailNotifications}
+            goToListing={goToListing}
+            listingsData={platformListings}
+            pendingListings={pendingListings}
+            submitListingForApproval={submitListingForApproval}
+          />
+        )}
+        {page === "admin" && (
+          <AdminDashboard
+            approveListing={approveListing}
+            emailNotifications={emailNotifications}
+            listingsData={platformListings}
+            pendingListings={pendingListings}
+          />
+        )}
         {page === "safety" && <SafetyPage />}
         {page === "terms" && <PolicyPage type="terms" />}
         {page === "privacy" && <PolicyPage type="privacy" />}
@@ -126,7 +288,7 @@ function App() {
   );
 }
 
-function Header({ page, setPage }) {
+function Header({ page, setPage, currentUser, setCurrentUser }) {
   const [scrolled, setScrolled] = useState(false);
   const navItems = [
     ["rentals", "Rent"],
@@ -157,7 +319,19 @@ function Header({ page, setPage }) {
         ))}
       </nav>
       <div className="nav-actions">
-        <button className="account-button" onClick={() => setPage("login")}>Sign in</button>
+        {currentUser ? (
+          <>
+            {currentUser.role === "landlord" && (
+              <button className="nav-list-button" onClick={() => setPage("dashboard")}>Add listing</button>
+            )}
+            <button className="account-button" onClick={() => setPage(currentUser.role === "agent" ? "admin" : "dashboard")}>
+              {currentUser.role === "agent" ? "Agent" : "Dashboard"}
+            </button>
+            <button className="account-button subtle" onClick={() => { setCurrentUser(null); setPage("home"); }}>Sign out</button>
+          </>
+        ) : (
+          <button className="account-button" onClick={() => setPage("login")}>Sign in</button>
+        )}
       </div>
       <nav className="mobile-nav" aria-label="Mobile navigation">
         {[
@@ -165,7 +339,7 @@ function Header({ page, setPage }) {
           ["rentals", "Search"],
           ["student", "Student"],
           ["airbnb", "Stays"],
-          ["advertise", "Ads"],
+          [currentUser?.role === "landlord" ? "dashboard" : "advertise", currentUser?.role === "landlord" ? "Add" : "Ads"],
         ].map(([key, label]) => (
           <button className={page === key ? "active" : ""} key={key} onClick={() => setPage(key)}>
             {label}
@@ -176,10 +350,14 @@ function Header({ page, setPage }) {
   );
 }
 
-function Home({ filters, setFilters, setPage, goToListing }) {
-  const featured = listings.filter((listing) => listing.isFeatured);
-  const studentListings = listings.filter((listing) => listing.category === "Student rentals").slice(0, 3);
-  const shortStayListings = listings.filter((listing) => listing.category === "Short stays").slice(0, 3);
+function Home({ currentUser, emailNotifications, listingsData, pendingListings, visitProfile, filters, setFilters, setPage, goToListing }) {
+  const featured = getPersonalizedFeaturedListings(listingsData, visitProfile);
+  const studentListings = listingsData.filter((listing) => listing.category === "Student rentals").slice(0, 3);
+  const shortStayListings = listingsData.filter((listing) => listing.category === "Short stays").slice(0, 3);
+  const topVisitedLocations = Object.entries(visitProfile.locations ?? {})
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 2)
+    .map(([location]) => location);
 
   return (
     <>
@@ -193,15 +371,32 @@ function Home({ filters, setFilters, setPage, goToListing }) {
           <SearchPanel filters={filters} setFilters={setFilters} onSearch={() => setPage("rentals")} />
           <div className="hero-actions">
             <button className="primary-button" onClick={() => setPage("rentals")}>Search Rentals</button>
-            <button className="secondary-button" onClick={() => setPage("advertise")}>Advertise With Us</button>
+            <button className="secondary-button" onClick={() => setPage(currentUser?.role === "landlord" ? "dashboard" : "advertise")}>
+              {currentUser?.role === "landlord" ? "Add Your Listing" : "Advertise With Us"}
+            </button>
           </div>
         </div>
       </section>
 
+      {currentUser && (
+        <HomeDashboard
+          currentUser={currentUser}
+          emailNotifications={emailNotifications}
+          featuredCount={featured.length}
+          pendingListings={pendingListings}
+          visitProfile={visitProfile}
+          setPage={setPage}
+        />
+      )}
+
       <RentalFlashcards
-        eyebrow="Featured"
+        eyebrow={visitProfile.viewCount ? "Recommended" : "Featured"}
         title="Featured Rental Properties"
-        text="Promoted and high-interest rentals from around Windhoek."
+        text={
+          visitProfile.viewCount
+            ? `Suggested from your recent browsing${topVisitedLocations.length ? ` around ${topVisitedLocations.join(" and ")}` : ""}.`
+            : "Promoted and high-interest rentals from around Windhoek."
+        }
         flashListings={featured}
         goToListing={goToListing}
       />
@@ -235,6 +430,50 @@ function Home({ filters, setFilters, setPage, goToListing }) {
       <HowItWorks />
       <SafetyNotice />
     </>
+  );
+}
+
+function HomeDashboard({ currentUser, emailNotifications, featuredCount, pendingListings, visitProfile, setPage }) {
+  const ownPending = pendingListings.filter((listing) => listing.ownerEmail === currentUser.email);
+  const ownEmails = emailNotifications.filter((email) => email.to === currentUser.email);
+  const topVisitedLocation = Object.entries(visitProfile.locations ?? {}).sort(([, a], [, b]) => b - a)[0]?.[0] ?? "Start browsing";
+  const roleLabel = currentUser.role === "agent" ? "Realtor Agent" : currentUser.role === "landlord" ? "Landlord" : "Renter";
+  const action =
+    currentUser.role === "landlord"
+      ? { label: "Add a Listing", page: "dashboard" }
+      : currentUser.role === "agent"
+        ? { label: "Review Listings", page: "admin" }
+        : { label: "Browse Rentals", page: "rentals" };
+
+  return (
+    <section className="home-dashboard">
+      <div className="home-dashboard-copy">
+        <p className="eyebrow">Welcome back</p>
+        <h2>Hello, {currentUser.name}</h2>
+        <p>
+          You are signed in as a {roleLabel}. Your NamRent tools are now available directly from the home page.
+        </p>
+      </div>
+      <div className="home-dashboard-stats">
+        <article>
+          <strong>{roleLabel}</strong>
+          <span>Account type</span>
+        </article>
+        <article>
+          <strong>{currentUser.role === "landlord" ? ownPending.length : featuredCount}</strong>
+          <span>{currentUser.role === "landlord" ? "Pending listings" : "Featured rentals"}</span>
+        </article>
+        <article>
+          <strong>{ownEmails.length}</strong>
+          <span>Approval emails</span>
+        </article>
+        <article>
+          <strong>{topVisitedLocation}</strong>
+          <span>Most visited area</span>
+        </article>
+      </div>
+      <button className="primary-button" onClick={() => setPage(action.page)}>{action.label}</button>
+    </section>
   );
 }
 
@@ -775,30 +1014,35 @@ function BrowseLocations({ setFilters, setPage }) {
   );
 }
 
-function LocationsPage({ setFilters, setPage }) {
+function LocationsPage({ listingsData, goToListing, setFilters, setPage }) {
   return (
-    <section className="section">
-      <SectionHeading eyebrow="Expansion" title="Locations" text="NamRent starts with Windhoek and is structured for broader Namibian coverage." />
-      <h2>Windhoek launch areas</h2>
-      <div className="location-grid">
-        {locations.map((location) => (
-          <button key={location} onClick={() => { setFilters((current) => ({ ...current, location })); setPage("rentals"); }}>
-            {location}
-          </button>
-        ))}
-      </div>
-      <h2 className="top-gap">Future towns</h2>
-      <div className="location-grid muted">
-        {futureLocations.map((location) => <button key={location}>{location}</button>)}
-      </div>
-    </section>
+    <>
+      <section className="section locations-intro">
+        <SectionHeading eyebrow="Expansion" title="Locations" text="NamRent starts with Windhoek and is structured for broader Namibian coverage." />
+      </section>
+      <WindhoekMap listings={listingsData} goToListing={goToListing} setFilters={setFilters} setPage={setPage} />
+      <section className="section">
+        <h2>Windhoek launch areas</h2>
+        <div className="location-grid">
+          {locations.map((location) => (
+            <button key={location} onClick={() => { setFilters((current) => ({ ...current, location })); setPage("rentals"); }}>
+              {location}
+            </button>
+          ))}
+        </div>
+        <h2 className="top-gap">Future towns</h2>
+        <div className="location-grid muted">
+          {futureLocations.map((location) => <button key={location}>{location}</button>)}
+        </div>
+      </section>
+    </>
   );
 }
 
 function HowItWorks() {
   return (
     <section className="section pale">
-      <SectionHeading eyebrow="How it works" title="Simple for renters and advertisers" text="The MVP focuses on search, details, contact, submission, and admin approval." />
+      <SectionHeading eyebrow="How it works" title="Simple for renters and advertisers" text="The MVP focuses on search, details, contact, submission, and listing approval." />
       <div className="steps-grid">
         {[
           ["Search", "Find rentals by location, price, type, and category."],
@@ -817,38 +1061,82 @@ function HowItWorks() {
   );
 }
 
-function PropertyForm() {
+function PropertyForm({ currentUser, onSubmitListing }) {
   const fields = [
-    ["Property title", "text"],
-    ["Location/suburb", "text"],
-    ["Monthly rental price", "number"],
-    ["Deposit amount", "number"],
-    ["Bedrooms", "text"],
-    ["Bathrooms", "number"],
-    ["Availability date", "date"],
-    ["Contact name", "text"],
-    ["Phone number", "tel"],
-    ["WhatsApp number", "tel"],
-    ["Email address", "email"],
+    ["title", "Property title", "text"],
+    ["location", "Location/suburb", "text"],
+    ["price", "Monthly rental price", "number"],
+    ["deposit", "Deposit amount", "number"],
+    ["bedrooms", "Bedrooms", "text"],
+    ["bathrooms", "Bathrooms", "number"],
+    ["availableFrom", "Availability date", "date"],
+    ["contactName", "Contact name", "text"],
+    ["phone", "Phone number", "tel"],
+    ["whatsapp", "WhatsApp number", "tel"],
+    ["email", "Email address", "email"],
   ];
+  const submitForm = (event) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const title = data.get("title");
+    const location = data.get("location");
+    const propertyType = data.get("propertyType");
+    const created = {
+      title,
+      description: data.get("description") || `${propertyType} submitted by ${currentUser?.name ?? "a landlord"} for NamRent approval.`,
+      price: Number(data.get("price")),
+      deposit: Number(data.get("deposit")),
+      location,
+      city: "Windhoek",
+      propertyType,
+      category: propertyType === "House" || propertyType === "Townhouse" ? "Family homes" : "Affordable rentals",
+      bedrooms: data.get("bedrooms"),
+      bathrooms: Number(data.get("bathrooms")),
+      parking: data.get("amenities")?.toString().toLowerCase().includes("parking") ? 1 : 0,
+      furnished: data.get("furnished"),
+      utilities: "Confirm water/electricity details with advertiser",
+      availableFrom: data.get("availableFrom") || "Confirm with advertiser",
+      pricePeriod: "per month",
+      badges: ["Pending Approval"],
+      image: "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=1200&q=80",
+      gallery: [
+        "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=80",
+      ],
+      contact: {
+        name: data.get("contactName"),
+        phone: data.get("phone"),
+        whatsapp: String(data.get("whatsapp") || "").replace(/\D/g, ""),
+        email: data.get("email"),
+      },
+      features: String(data.get("amenities") || "")
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean),
+      safety: "This landlord-submitted listing is reviewed by NamRent before publication.",
+    };
+    onSubmitListing(created);
+    event.currentTarget.reset();
+  };
 
   return (
-    <form className="wide-form" onSubmit={(event) => { event.preventDefault(); alert("Demo submission received. A real build would send this to admin approval."); }}>
+    <form className="wide-form" onSubmit={submitForm}>
       <label>
         <span>Property type</span>
-        <select>
+        <select name="propertyType">
           {propertyTypes.map((type) => <option key={type}>{type}</option>)}
         </select>
       </label>
-      {fields.map(([label, type]) => (
-        <label key={label}>
+      {fields.map(([name, label, type]) => (
+        <label key={name}>
           <span>{label}</span>
-          <input type={type} required />
+          <input name={name} type={type} defaultValue={name === "contactName" ? currentUser?.name ?? "" : name === "email" ? currentUser?.email ?? "" : ""} required />
         </label>
       ))}
       <label>
         <span>Furnished status</span>
-        <select>
+        <select name="furnished">
           <option>Furnished</option>
           <option>Semi-furnished</option>
           <option>Unfurnished</option>
@@ -856,11 +1144,11 @@ function PropertyForm() {
       </label>
       <label className="full-field">
         <span>Description</span>
-        <textarea rows="5" placeholder="Describe the rental, rules, utilities, security, parking, and nearby landmarks." />
+        <textarea name="description" rows="5" placeholder="Describe the rental, rules, utilities, security, parking, and nearby landmarks." />
       </label>
       <label className="full-field">
         <span>Optional amenities</span>
-        <input placeholder="Parking, Wi-Fi, security, nearby campus, pet-friendly..." />
+        <input name="amenities" placeholder="Parking, Wi-Fi, security, nearby campus, pet-friendly..." />
       </label>
       <button className="primary-button" type="submit">Submit for Approval</button>
     </form>
@@ -906,67 +1194,187 @@ function ContactPage() {
   );
 }
 
-function LoginPage() {
+function LoginPage({ setUser, setPage }) {
+  const demoUsers = [
+    { role: "renter", label: "Renter", name: "Lisan Renter", email: "renter@namrent.na" },
+    { role: "landlord", label: "Landlord", name: "Martha Landlord", email: "landlord@namrent.na" },
+    { role: "agent", label: "Realtor Agent", name: "Realtor Agent", email: "agent@namrent.na" },
+  ];
+  const [mode, setMode] = useState("signin");
+  const [role, setRole] = useState("renter");
+  const selectedDemo = demoUsers.find((user) => user.role === role);
+  const handleAuth = (event) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const user = {
+      role,
+      name: data.get("name") || (mode === "signin" ? selectedDemo.name : "New NamRent User"),
+      email: data.get("email") || selectedDemo.email,
+    };
+    setUser(user);
+    setPage("home");
+  };
+  const handleSocialAuth = (provider) => {
+    setUser({
+      role,
+      name: `${selectedDemo.label} via ${provider}`,
+      email: `${selectedDemo.role}.${provider.toLowerCase()}@namrent.na`,
+      provider,
+    });
+    setPage("home");
+  };
+  const handleAuthSuccess = (user) => {
+    setUser(user);
+    setPage("home");
+  };
+
   return (
-    <section className="section form-page">
-      <SectionHeading eyebrow="Accounts" title="Login or Register" text="Account screens are prepared for renters, landlords, agents, and admins." />
+    <section className="section form-page auth-page">
+      <div className="auth-header">
+        <p className="eyebrow">Accounts</p>
+        <h1>Access your NamRent profile</h1>
+        <p>Sign in or create an account to browse, submit, or approve rentals.</p>
+      </div>
       <div className="auth-grid">
-        <form className="auth-card">
-          <h2>Login</h2>
-          <label><span>Email</span><input type="email" /></label>
-          <label><span>Password</span><input type="password" /></label>
-          <button className="primary-button full">Login</button>
+        <form className="auth-card" onSubmit={handleAuth}>
+          <div className="auth-tabs">
+            <button className={mode === "signin" ? "active" : ""} type="button" onClick={() => setMode("signin")}>Sign in</button>
+            <button className={mode === "signup" ? "active" : ""} type="button" onClick={() => setMode("signup")}>Sign up</button>
+          </div>
+          <h2>{mode === "signin" ? "Welcome back" : "Create your account"}</h2>
+          <div className="role-picker">
+            {demoUsers.map((user) => (
+              <button className={role === user.role ? "selected" : ""} key={user.role} type="button" onClick={() => setRole(user.role)}>
+                {user.label}
+              </button>
+            ))}
+          </div>
+          <div className="social-login-grid">
+            <GoogleSignIn role={role} fallbackUser={selectedDemo} onSuccess={handleAuthSuccess} />
+            <button className="social-login-button facebook" type="button" onClick={() => handleSocialAuth("Facebook")}>
+              <span aria-hidden="true">f</span>
+              Continue with Facebook
+            </button>
+          </div>
+          <div className="auth-divider"><span>or use email</span></div>
+          {mode === "signup" && <label><span>Full name</span><input name="name" placeholder="Your full name" autoComplete="name" required /></label>}
+          <label><span>Email</span><input name="email" type="email" placeholder={selectedDemo.email} autoComplete="off" /></label>
+          <label><span>Password</span><input type="password" placeholder={mode === "signin" ? "Enter password" : "Create password"} autoComplete={mode === "signin" ? "current-password" : "new-password"} /></label>
+          {mode === "signup" && (
+            <label><span>Phone number</span><input name="phone" type="tel" placeholder="+264 ..." autoComplete="tel" /></label>
+          )}
+          <button className="primary-button full">{mode === "signin" ? `Sign in as ${selectedDemo.label}` : `Sign up as ${selectedDemo.label}`}</button>
         </form>
-        <form className="auth-card">
-          <h2>Create Account</h2>
-          <label><span>Name</span><input /></label>
-          <label><span>Email</span><input type="email" /></label>
-          <label><span>Role</span><select><option>Renter</option><option>Landlord</option><option>Agent</option></select></label>
-          <button className="secondary-button full">Register</button>
-        </form>
+        <article className="auth-side-card">
+          <h2>{mode === "signin" ? "Need an account?" : "Already registered?"}</h2>
+          <p>
+            {mode === "signin"
+              ? "Use Sign up to create a renter, landlord, or realtor agent profile."
+              : "Use Sign in if you already have a NamRent profile."}
+          </p>
+          <button className="secondary-button full" onClick={() => setMode(mode === "signin" ? "signup" : "signin")}>
+            {mode === "signin" ? "Go to Sign up" : "Go to Sign in"}
+          </button>
+          <h2>Role access</h2>
+          <p><strong>Renter:</strong> browse rentals and saved options.</p>
+          <p><strong>Landlord:</strong> submit a rental for NamRent approval.</p>
+          <p><strong>Realtor Agent:</strong> review pending listings and trigger approval emails.</p>
+        </article>
       </div>
     </section>
   );
 }
 
-function UserDashboard({ goToListing }) {
+function UserDashboard({ currentUser, emailNotifications, goToListing, listingsData, pendingListings, submitListingForApproval }) {
+  if (!currentUser) {
+    return (
+      <section className="section">
+        <SectionHeading eyebrow="Dashboard" title="Please sign in" text="Sign in as a renter, landlord, or realtor agent to continue." />
+      </section>
+    );
+  }
+  const ownPending = pendingListings.filter((listing) => listing.ownerEmail === currentUser.email);
+  const ownEmails = emailNotifications.filter((email) => email.to === currentUser.email);
+
+  if (currentUser.role === "landlord") {
+    return (
+      <section className="section dashboard-page">
+        <SectionHeading eyebrow="Landlord Dashboard" title="Submit a Place for Listing" text="Your property will stay pending until NamRent approves it. Once approved, an email notification is generated for you." />
+        {ownEmails.length > 0 && (
+          <div className="email-panel">
+            <h2>Approval Emails</h2>
+            {ownEmails.map((email) => (
+              <article key={email.id}>
+                <strong>{email.subject}</strong>
+                <p>{email.message}</p>
+              </article>
+            ))}
+          </div>
+        )}
+        <PropertyForm currentUser={currentUser} onSubmitListing={submitListingForApproval} />
+        <div className="admin-table">
+          <div className="table-row head"><span>Your Submission</span><span>Status</span><span>Submitted</span></div>
+          {ownPending.map((listing) => (
+            <div className="table-row" key={listing.id}>
+              <span>{listing.title}</span>
+              <span>{listing.status}</span>
+              <span>{new Date(listing.submittedAt).toLocaleDateString()}</span>
+            </div>
+          ))}
+          {!ownPending.length && <div className="table-row"><span>No pending submissions yet.</span><span>-</span><span>-</span></div>}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="section">
-      <SectionHeading eyebrow="Dashboard" title="Renter Dashboard" text="Saved listings, alerts, and enquiries will live here in the full build." />
-      <ListingGrid listingsToShow={listings.slice(0, 2)} goToListing={goToListing} />
+      <SectionHeading eyebrow="Renter Dashboard" title={`Welcome, ${currentUser.name}`} text="Browse highlighted rentals and continue comparing places." />
+      <ListingGrid listingsToShow={listingsData.slice(0, 2)} goToListing={goToListing} />
     </section>
   );
 }
 
-function AdminDashboard() {
+function AdminDashboard({ approveListing, emailNotifications, listingsData, pendingListings }) {
   const stats = [
-    ["Total listings", listings.length],
-    ["Awaiting approval", 3],
-    ["Active rentals", listings.length],
-    ["Student listings", listings.filter((listing) => listing.category === "Student rentals").length],
-    ["Short stays", listings.filter((listing) => listing.category === "Short stays").length],
+    ["Total listings", listingsData.length],
+    ["Awaiting approval", pendingListings.length],
+    ["Active rentals", listingsData.length],
+    ["Student listings", listingsData.filter((listing) => listing.category === "Student rentals").length],
+    ["Short stays", listingsData.filter((listing) => listing.category === "Short stays").length],
     ["Advertisements", 2],
   ];
 
   return (
     <section className="section admin-page">
-      <SectionHeading eyebrow="Admin" title="Platform Overview" text="A front-end admin panel concept for approvals, adverts, reports, and analytics." />
+      <SectionHeading eyebrow="Realtor Agent" title="Approval Dashboard" text="Review landlord submissions, approve listings, and generate approval email notifications." />
       <div className="stat-grid">
         {stats.map(([label, value]) => <article key={label}><strong>{value}</strong><span>{label}</span></article>)}
       </div>
       <div className="admin-table">
-        <div className="table-row head"><span>Listing</span><span>Status</span><span>Action</span></div>
-        {listings.slice(0, 4).map((listing) => (
+        <div className="table-row head"><span>Pending Listing</span><span>Status</span><span>Action</span></div>
+        {pendingListings.map((listing) => (
           <div className="table-row" key={listing.id}>
             <span>{listing.title}</span>
             <span>{listing.status}</span>
-            <span>Review</span>
+            <button className="table-action" onClick={() => approveListing(listing.id)}>Approve</button>
           </div>
         ))}
+        {!pendingListings.length && <div className="table-row"><span>No pending listings.</span><span>-</span><span>-</span></div>}
+      </div>
+      <div className="email-panel">
+        <h2>Approval Email Log</h2>
+        {emailNotifications.map((email) => (
+          <article key={email.id}>
+            <strong>{email.to}</strong>
+            <p>{email.subject}: {email.message}</p>
+          </article>
+        ))}
+        {!emailNotifications.length && <p>No approval emails generated yet.</p>}
       </div>
       <form className="import-panel" onSubmit={(event) => { event.preventDefault(); alert("Demo import staged. A full build would parse this text into pending listings."); }}>
         <h2>Facebook Group Import</h2>
-        <p>Paste rental posts copied from a group, CSV export, or approved data source. Imported listings should remain pending until admin verification.</p>
+        <p>Paste rental posts copied from a group, CSV export, or approved data source. Imported listings should remain pending until realtor agent verification.</p>
         <textarea rows="7" placeholder="Paste listing text here: title, location, price, bedrooms, contact details, and description..." />
         <button className="primary-button">Stage Imported Listings</button>
       </form>
@@ -1150,7 +1558,7 @@ function Footer({ setPage }) {
           ["safety", "Rental safety"],
           ["privacy", "Privacy policy"],
           ["terms", "Terms"],
-          ["admin", "Admin demo"],
+          ["admin", "Realtor Agent"],
         ].map(([key, label]) => <button key={key} onClick={() => setPage(key)}>{label}</button>)}
       </div>
     </footer>

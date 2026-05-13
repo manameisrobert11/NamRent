@@ -4,6 +4,8 @@ import { listings, locations, adverts, enquiries } from "./sampleData.js";
 
 const app = express();
 const port = process.env.PORT || 4200;
+const pendingListings = [];
+const approvalEmails = [];
 
 app.use(cors());
 app.use(express.json({ limit: "2mb" }));
@@ -60,6 +62,14 @@ app.get("/api/adverts", (_req, res) => {
   res.json(adverts);
 });
 
+app.get("/api/admin/pending-listings", (_req, res) => {
+  res.json(pendingListings);
+});
+
+app.get("/api/admin/approval-emails", (_req, res) => {
+  res.json(approvalEmails);
+});
+
 app.post("/api/listings", (req, res) => {
   const created = {
     id: `pending-${Date.now()}`,
@@ -67,7 +77,37 @@ app.post("/api/listings", (req, res) => {
     createdAt: new Date().toISOString(),
     ...req.body,
   };
+  pendingListings.unshift(created);
   res.status(201).json(created);
+});
+
+app.post("/api/admin/listings/:id/approve", (req, res) => {
+  const pending = pendingListings.find((item) => item.id === req.params.id);
+  if (!pending) {
+    res.status(404).json({ message: "Pending listing not found" });
+    return;
+  }
+
+  const approved = {
+    ...pending,
+    id: `approved-${Date.now()}`,
+    status: "active",
+    approvedAt: new Date().toISOString(),
+    badges: [...new Set([...(pending.badges ?? []), "NamRent Approved"])],
+  };
+  listings.unshift(approved);
+  pendingListings.splice(pendingListings.indexOf(pending), 1);
+
+  const email = {
+    id: `email-${Date.now()}`,
+    to: pending.ownerEmail ?? pending.contact?.email,
+    subject: "Your NamRent listing has been approved",
+    message: `${pending.title} has been approved and is now live on NamRent.`,
+    createdAt: new Date().toISOString(),
+  };
+  approvalEmails.unshift(email);
+
+  res.json({ approved, email });
 });
 
 app.post("/api/enquiries", (req, res) => {
