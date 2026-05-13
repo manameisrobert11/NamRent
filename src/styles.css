@@ -601,12 +601,15 @@ textarea {
 
 .room-flash-viewport {
   cursor: grab;
+  margin-left: calc(clamp(18px, 4vw, 56px) * -1);
+  margin-right: calc(clamp(18px, 4vw, 56px) * -1);
   overflow: hidden;
   position: relative;
   touch-action: pan-y;
   user-select: none;
   --room-card-gap: 28px;
-  --room-card-width: calc((100% - (var(--room-card-gap) * 3) - 56px) / 4);
+  --room-edge-space: clamp(18px, 4vw, 56px);
+  --room-card-width: calc((100% - (var(--room-edge-space) * 2) - (var(--room-card-gap) * 3)) / 4);
   --room-card-step: calc(var(--room-card-width) + var(--room-card-gap));
 }
 
@@ -617,7 +620,7 @@ textarea {
 .room-flash-track {
   display: flex;
   gap: var(--room-card-gap);
-  padding: 4px 56px 8px 0;
+  padding: 4px var(--room-edge-space) 8px;
   transition: transform 620ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -710,11 +713,11 @@ textarea {
 }
 
 .room-scroll-button.left {
-  left: 0;
+  left: max(10px, calc(var(--room-edge-space) - 28px));
 }
 
 .room-scroll-button.right {
-  right: 0;
+  right: max(10px, calc(var(--room-edge-space) - 28px));
 }
 
 .room-dots {
@@ -1539,7 +1542,7 @@ textarea {
   }
 
   .room-flash-viewport {
-    --room-card-width: calc((100% - var(--room-card-gap) - 56px) / 2);
+    --room-card-width: calc((100% - (var(--room-edge-space) * 2) - var(--room-card-gap)) / 2);
   }
 
   .location-grid {
@@ -1615,11 +1618,15 @@ textarea {
   }
 
   .room-flash-viewport {
-    --room-card-width: 100%;
+    margin-left: -16px;
+    margin-right: -16px;
+    --room-edge-space: 16px;
+    --room-card-width: calc(100% - (var(--room-edge-space) * 2));
   }
 
   .room-flash-track {
-    padding-right: 0;
+    padding-left: var(--room-edge-space);
+    padding-right: var(--room-edge-space);
   }
 
   .room-scroll-button {
