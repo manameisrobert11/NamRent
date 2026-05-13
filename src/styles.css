@@ -56,7 +56,15 @@ img {
   position: sticky;
   right: 0;
   top: 0;
+  transform: translateY(0);
+  transition: transform 220ms ease, opacity 220ms ease;
   z-index: 20;
+}
+
+.site-header.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-100%);
 }
 
 .brand {

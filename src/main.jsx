@@ -127,6 +127,7 @@ function App() {
 }
 
 function Header({ page, setPage }) {
+  const [scrolled, setScrolled] = useState(false);
   const navItems = [
     ["rentals", "Rent"],
     ["houses", "Houses"],
@@ -136,8 +137,15 @@ function Header({ page, setPage }) {
     ["advertise", "Advertise"],
   ];
 
+  useEffect(() => {
+    const handleScroll = () => setScrolled(window.scrollY > 8);
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   return (
-    <header className="site-header">
+    <header className={scrolled ? "site-header hidden" : "site-header"}>
       <button className="brand" onClick={() => setPage("home")} aria-label="Go to NamRent home">
         <img className="brand-logo" src="/namrent-logo.png" alt="" />
       </button>
