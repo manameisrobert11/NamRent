@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;500;600;700;800;900&display=swap");
+
 :root {
   --blue-900: #062652;
   --blue-800: #0a3470;
@@ -13,7 +15,7 @@
   --shadow: 0 18px 40px rgba(8, 47, 97, 0.1);
   color: var(--ink);
   font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    "Nunito Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: var(--blue-050);
 }
 
@@ -24,6 +26,7 @@
 body {
   margin: 0;
   background: var(--blue-050);
+  overflow-x: hidden;
 }
 
 button,
@@ -301,23 +304,53 @@ img {
 
 .search-panel {
   align-items: end;
-  background: rgba(255, 255, 255, 0.98);
-  border: 1px solid rgba(217, 229, 244, 0.78);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(247, 251, 255, 0.98));
+  border: 1px solid rgba(203, 217, 234, 0.9);
   border-radius: 8px;
-  box-shadow: 0 20px 44px rgba(4, 32, 74, 0.14);
+  box-shadow: 0 22px 48px rgba(4, 32, 74, 0.16);
   color: var(--ink);
   display: grid;
-  gap: 12px;
-  grid-template-columns: 1.4fr 1fr 1fr 1fr auto;
+  gap: 10px;
+  grid-template-columns: minmax(220px, 1.45fr) repeat(3, minmax(160px, 1fr)) 112px;
   margin: 0 auto;
   max-width: 1120px;
-  padding: 14px;
+  padding: 12px;
+  position: relative;
+}
+
+.search-panel::before {
+  background: var(--blue-700);
+  border-radius: 8px 8px 0 0;
+  content: "";
+  height: 3px;
+  left: 10px;
+  position: absolute;
+  right: 10px;
+  top: 0;
 }
 
 .search-panel.compact {
+  background: transparent;
+  border: 0;
   box-shadow: none;
+  gap: 12px;
   grid-template-columns: 1fr;
   padding: 0;
+}
+
+.search-panel.compact::before {
+  display: none;
+}
+
+.search-panel > .primary-button {
+  min-height: 46px;
+  padding-left: 18px;
+  padding-right: 18px;
+}
+
+.search-panel:not(.compact) > .primary-button {
+  box-shadow: 0 10px 22px rgba(13, 79, 158, 0.18);
 }
 
 label {
@@ -327,21 +360,31 @@ label {
 
 label span,
 .location-field > span {
-  color: var(--muted);
-  font-size: 0.8rem;
-  font-weight: 750;
+  color: var(--blue-800);
+  font-size: 0.76rem;
+  font-weight: 850;
 }
 
 input,
 select,
 textarea {
-  background: #fbfdff;
-  border: 1px solid var(--line);
+  background: var(--white);
+  border: 1px solid #cbd9ea;
   border-radius: 7px;
   color: var(--ink);
-  min-height: 44px;
-  padding: 10px 12px;
+  min-height: 46px;
+  padding: 10px 13px;
+  transition: border-color 140ms ease, box-shadow 140ms ease, background 140ms ease;
   width: 100%;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  background: var(--white);
+  border-color: var(--blue-700);
+  box-shadow: 0 0 0 3px rgba(13, 79, 158, 0.12);
+  outline: 0;
 }
 
 textarea {
@@ -356,21 +399,23 @@ textarea {
 
 .location-trigger {
   align-items: center;
-  background: #fbfdff;
-  border: 1px solid var(--line);
+  background: var(--white);
+  border: 1px solid #cbd9ea;
   border-radius: 7px;
   color: var(--ink);
   display: grid;
   gap: 10px;
-  grid-template-columns: minmax(0, 1fr) 22px;
-  min-height: 44px;
-  padding: 10px 12px;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  min-height: 46px;
+  padding: 10px 10px 10px 13px;
   text-align: left;
+  transition: border-color 140ms ease, box-shadow 140ms ease, background 140ms ease;
   width: 100%;
 }
 
 .location-trigger.open,
 .location-trigger:hover {
+  background: var(--white);
   border-color: var(--blue-700);
   box-shadow: 0 0 0 3px rgba(13, 79, 158, 0.12);
 }
@@ -383,15 +428,24 @@ textarea {
 
 .dropdown-arrow {
   align-items: center;
-  color: var(--blue-700);
+  background: var(--blue-100);
+  border-radius: 7px;
+  color: var(--blue-800);
   display: inline-flex;
-  font-size: 1.15rem;
-  font-weight: 900;
-  height: 22px;
+  height: 28px;
   justify-content: center;
-  line-height: 1;
   transition: transform 160ms ease;
-  width: 22px;
+  width: 28px;
+}
+
+.dropdown-arrow::before {
+  border-bottom: 2px solid currentColor;
+  border-right: 2px solid currentColor;
+  content: "";
+  height: 7px;
+  margin-top: -4px;
+  transform: rotate(45deg);
+  width: 7px;
 }
 
 .location-trigger.open .dropdown-arrow {
@@ -399,12 +453,13 @@ textarea {
 }
 
 .location-menu {
-  background: var(--white);
-  border: 1px solid rgba(13, 79, 158, 0.18);
+  background:
+    linear-gradient(180deg, var(--white), #fbfdff);
+  border: 1px solid rgba(13, 79, 158, 0.2);
   border-radius: 8px;
-  box-shadow: 0 24px 60px rgba(6, 38, 82, 0.22);
+  box-shadow: 0 26px 62px rgba(6, 38, 82, 0.24);
   display: grid;
-  gap: 14px;
+  gap: 12px;
   left: 0;
   min-width: min(520px, calc(100vw - 32px));
   max-height: min(590px, calc(100vh - 180px));
@@ -429,7 +484,7 @@ textarea {
 
 .location-menu-top {
   align-items: center;
-  background: var(--white);
+  background: rgba(255, 255, 255, 0.98);
   border-bottom: 1px solid var(--line);
   display: flex;
   justify-content: space-between;
@@ -441,18 +496,20 @@ textarea {
 
 .location-menu-top strong {
   color: var(--blue-900);
+  font-size: 0.96rem;
 }
 
 .location-menu-top button {
   background: transparent;
   border: 0;
   color: var(--blue-700);
+  font-size: 0.86rem;
   font-weight: 800;
   padding: 4px 0;
 }
 
 .location-menu-label {
-  color: var(--muted);
+  color: var(--blue-800);
   font-size: 0.78rem;
   font-weight: 850;
   margin: 2px 16px 0;
@@ -472,6 +529,12 @@ textarea {
   margin-bottom: 16px;
 }
 
+.location-menu > input {
+  background: var(--white);
+  border-color: #cbd9ea;
+  box-shadow: inset 0 1px 0 rgba(6, 38, 82, 0.03);
+}
+
 .location-chip-grid {
   display: grid;
   gap: 8px;
@@ -480,14 +543,15 @@ textarea {
 
 .location-chip-grid button,
 .location-list button {
-  background: var(--blue-050);
-  border: 1px solid transparent;
+  background: var(--white);
+  border: 1px solid #dce8f5;
   border-radius: 7px;
   color: var(--blue-900);
   font-weight: 750;
   min-height: 42px;
   padding: 10px 12px;
   text-align: left;
+  transition: background 140ms ease, border-color 140ms ease, box-shadow 140ms ease, color 140ms ease, transform 140ms ease;
 }
 
 .location-chip-grid button:hover,
@@ -496,7 +560,13 @@ textarea {
 .location-list button.selected {
   background: var(--blue-100);
   border-color: var(--blue-700);
+  box-shadow: 0 8px 18px rgba(13, 79, 158, 0.1);
   color: var(--blue-800);
+}
+
+.location-chip-grid button:hover,
+.location-list button:hover {
+  transform: translateY(-1px);
 }
 
 .location-list {
@@ -531,21 +601,27 @@ textarea {
 }
 
 .price-option-grid button {
-  background: var(--blue-050);
-  border: 1px solid transparent;
+  background: var(--white);
+  border: 1px solid #dce8f5;
   border-radius: 7px;
   color: var(--blue-900);
   font-weight: 750;
   min-height: 42px;
   padding: 10px;
   text-align: left;
+  transition: background 140ms ease, border-color 140ms ease, box-shadow 140ms ease, color 140ms ease, transform 140ms ease;
 }
 
 .price-option-grid button:hover,
 .price-option-grid button.selected {
   background: var(--blue-100);
   border-color: var(--blue-700);
+  box-shadow: 0 8px 18px rgba(13, 79, 158, 0.1);
   color: var(--blue-800);
+}
+
+.price-option-grid button:hover {
+  transform: translateY(-1px);
 }
 
 .custom-price-grid {
@@ -1354,7 +1430,8 @@ textarea {
 }
 
 .filter-panel {
-  background: var(--white);
+  background:
+    linear-gradient(180deg, var(--white), #fbfdff);
   border: 1px solid rgba(217, 229, 244, 0.86);
   border-radius: 8px;
   box-shadow: 0 14px 34px rgba(8, 47, 97, 0.06);
@@ -1367,7 +1444,21 @@ textarea {
 
 .filter-panel h2 {
   color: var(--blue-900);
-  margin: 0;
+  margin: 0 0 2px;
+}
+
+.filter-panel .search-panel.compact {
+  gap: 13px;
+}
+
+.filter-panel label span,
+.filter-panel .location-field > span {
+  color: var(--blue-800);
+}
+
+.filter-panel select {
+  background: var(--white);
+  cursor: pointer;
 }
 
 .results-bar {
@@ -1924,83 +2015,126 @@ textarea {
 }
 
 .chat-button {
-  background: var(--blue-700);
+  background:
+    linear-gradient(135deg, var(--blue-700), var(--blue-900));
   border: 0;
   border-radius: 999px;
-  box-shadow: var(--shadow);
+  box-shadow: 0 18px 36px rgba(6, 38, 82, 0.25);
   color: var(--white);
   font-weight: 850;
-  height: 58px;
-  width: 58px;
+  height: 60px;
+  letter-spacing: 0;
+  width: 60px;
 }
 
 .chat-window {
-  background: var(--white);
-  border: 1px solid var(--line);
+  background:
+    linear-gradient(180deg, var(--white), #fbfdff);
+  border: 1px solid rgba(203, 217, 234, 0.95);
   border-radius: 8px;
   bottom: 72px;
-  box-shadow: var(--shadow);
+  box-shadow: 0 24px 60px rgba(6, 38, 82, 0.24);
   overflow: hidden;
   position: absolute;
   right: 0;
-  width: min(360px, calc(100vw - 32px));
+  width: min(410px, calc(100vw - 32px));
 }
 
 .chat-window header {
   align-items: center;
-  background: var(--blue-800);
+  background:
+    linear-gradient(135deg, var(--blue-900), var(--blue-700));
   color: var(--white);
   display: flex;
   justify-content: space-between;
-  padding: 12px 14px;
+  padding: 15px 16px;
+}
+
+.chat-window header div {
+  display: grid;
+  gap: 3px;
+}
+
+.chat-window header span {
+  color: #c7d9ef;
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
 .chat-window header button {
   background: transparent;
   border: 0;
   color: var(--white);
+  font-size: 1rem;
   font-weight: 900;
+  height: 32px;
+  width: 32px;
 }
 
 .chat-messages,
 .quick-replies {
   display: grid;
-  gap: 8px;
-  padding: 12px;
+  gap: 10px;
+  padding: 14px;
 }
 
 .chat-messages {
-  max-height: 190px;
+  background:
+    linear-gradient(180deg, rgba(245, 250, 255, 0.9), rgba(255, 255, 255, 0.95));
+  max-height: 280px;
   overflow: auto;
 }
 
 .chat-messages p {
-  background: var(--blue-050);
+  background: var(--white);
+  border: 1px solid rgba(217, 229, 244, 0.86);
   border-radius: 8px;
-  line-height: 1.45;
+  box-shadow: 0 8px 18px rgba(8, 47, 97, 0.05);
+  line-height: 1.5;
   margin: 0;
-  padding: 10px;
+  padding: 11px 12px;
+  white-space: pre-line;
 }
 
 .chat-messages p.user {
-  background: var(--blue-700);
+  background:
+    linear-gradient(135deg, var(--blue-700), var(--blue-800));
+  border-color: transparent;
   color: var(--white);
   justify-self: end;
   max-width: 86%;
 }
 
 .chat-messages p.bot {
+  color: var(--ink);
   justify-self: start;
   max-width: 92%;
 }
 
-.quick-replies button {
+.quick-replies {
   background: var(--white);
-  border: 1px solid var(--line);
+  border-top: 1px solid var(--line);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.quick-replies button {
+  background: #fbfdff;
+  border: 1px solid #dce8f5;
   border-radius: 7px;
   color: var(--blue-800);
-  padding: 10px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  min-height: 42px;
+  padding: 10px 11px;
   text-align: left;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 140ms ease;
+}
+
+.quick-replies button:hover {
+  background: var(--blue-100);
+  border-color: var(--blue-700);
+  color: var(--blue-900);
+  transform: translateY(-1px);
 }
 
 .chat-input {
@@ -2008,11 +2142,11 @@ textarea {
   display: grid;
   gap: 8px;
   grid-template-columns: minmax(0, 1fr) auto;
-  padding: 12px;
+  padding: 14px;
 }
 
 .chat-input input {
-  min-height: 40px;
+  min-height: 44px;
 }
 
 .chat-input button {
@@ -2021,7 +2155,7 @@ textarea {
   border-radius: 7px;
   color: var(--white);
   font-weight: 800;
-  padding: 0 13px;
+  padding: 0 16px;
 }
 
 .top-gap {
@@ -2082,29 +2216,93 @@ textarea {
 
 @media (max-width: 720px) {
   .site-header {
-    padding: 14px 16px;
+    gap: 10px;
+    min-height: 64px;
+    padding: 6px 12px;
   }
 
   .brand {
+    height: 52px;
     min-width: 0;
+    width: min(188px, 58vw);
   }
 
   .brand-logo {
     height: 52px;
-    width: 220px;
+    width: 188px;
+  }
+
+  .nav-actions {
+    gap: 6px;
+  }
+
+  .nav-list-button {
+    font-size: 0.78rem;
+    min-height: 36px;
+    padding: 8px 10px;
   }
 
   .account-button {
     display: none;
   }
 
+  .mobile-nav {
+    box-shadow: 0 -10px 26px rgba(6, 38, 82, 0.11);
+    gap: 0;
+    padding: 7px 6px calc(7px + env(safe-area-inset-bottom));
+  }
+
+  .mobile-nav button {
+    border-radius: 7px;
+    font-size: 0.74rem;
+    min-height: 42px;
+  }
+
+  .mobile-nav button.active {
+    background: var(--blue-100);
+  }
+
   .hero {
-    min-height: 520px;
-    padding: 44px 16px 64px;
+    min-height: auto;
+    padding: 34px 14px 42px;
   }
 
   .hero h1 {
-    font-size: 2.15rem;
+    font-size: 1.95rem;
+    max-width: 350px;
+  }
+
+  .hero p {
+    font-size: 0.95rem;
+    line-height: 1.55;
+    margin-bottom: 16px;
+  }
+
+  .hero-actions {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: 1fr;
+  }
+
+  .search-panel {
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .search-panel::before {
+    left: 8px;
+    right: 8px;
+  }
+
+  .search-panel .primary-button {
+    width: 100%;
+  }
+
+  input,
+  select,
+  textarea,
+  .location-trigger {
+    min-height: 46px;
   }
 
   .stats-band {
@@ -2118,6 +2316,14 @@ textarea {
 
   .map-heading {
     text-align: left;
+  }
+
+  .map-section {
+    padding: 38px 14px;
+  }
+
+  .map-layout {
+    gap: 14px;
   }
 
   .map-box,
@@ -2135,7 +2341,16 @@ textarea {
   }
 
   .section {
-    padding: 42px 16px;
+    padding: 38px 14px;
+  }
+
+  .section-heading {
+    margin-bottom: 20px;
+  }
+
+  .section-heading h2,
+  .map-heading h2 {
+    font-size: 1.65rem;
   }
 
   .listing-grid,
@@ -2171,7 +2386,9 @@ textarea {
   .search-panel.compact .location-menu,
   .search-panel.compact .selector-menu {
     left: 0;
-    min-width: min(340px, calc(100vw - 32px));
+    max-height: min(68vh, 520px);
+    min-width: min(340px, calc(100vw - 28px));
+    width: min(340px, calc(100vw - 28px));
   }
 
   .location-chip-grid,
@@ -2194,7 +2411,11 @@ textarea {
 
   .room-scroll-button {
     bottom: -4px;
+    border-width: 3px;
+    font-size: 1.55rem;
+    height: 44px;
     top: auto;
+    width: 44px;
   }
 
   .room-scroll-button.left {
@@ -2210,7 +2431,7 @@ textarea {
   }
 
   .main-photo {
-    height: 310px;
+    height: 280px;
   }
 
   .thumb-grid {
@@ -2218,7 +2439,20 @@ textarea {
   }
 
   .thumb-grid img {
-    height: 140px;
+    height: 124px;
+  }
+
+  .details-layout {
+    gap: 18px;
+    padding: 28px 14px;
+  }
+
+  .details-main h1 {
+    font-size: 1.9rem;
+  }
+
+  .details-price {
+    font-size: 1.2rem;
   }
 
   .table-row {
@@ -2226,8 +2460,27 @@ textarea {
   }
 
   .chatbot {
-    bottom: 78px;
-    right: 16px;
+    bottom: calc(76px + env(safe-area-inset-bottom));
+    right: 12px;
+  }
+
+  .chat-button {
+    height: 52px;
+    width: 52px;
+  }
+
+  .chat-window {
+    bottom: 62px;
+    max-height: min(620px, calc(100vh - 154px));
+    width: min(360px, calc(100vw - 24px));
+  }
+
+  .chat-messages {
+    max-height: min(260px, calc(100vh - 390px));
+  }
+
+  .quick-replies {
+    grid-template-columns: 1fr;
   }
 
   .carousel-heading {
@@ -2245,6 +2498,61 @@ textarea {
 
   .carousel-caption {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .brand {
+    width: min(160px, 52vw);
+  }
+
+  .brand-logo {
+    width: 160px;
+  }
+
+  .hero h1 {
+    font-size: 1.72rem;
+  }
+
+  .room-flash-card {
+    gap: 10px;
+  }
+
+  .room-flash-card img {
+    border-radius: 12px;
+  }
+
+  .listing-card {
+    box-shadow: 0 12px 24px rgba(8, 47, 97, 0.07);
+  }
+
+  .image-button {
+    height: 205px;
+  }
+
+  .map-results {
+    padding: 14px;
+  }
+
+  .map-area-chips {
+    flex-wrap: nowrap;
+    margin: 0 -14px;
+    overflow-x: auto;
+    padding: 0 14px 4px;
+  }
+
+  .map-area-chips button {
+    flex: 0 0 auto;
+  }
+
+  .footer-links {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .footer-links button {
+    text-align: left;
   }
 }
 

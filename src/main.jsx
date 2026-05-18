@@ -282,7 +282,7 @@ function App() {
         {page === "terms" && <PolicyPage type="terms" />}
         {page === "privacy" && <PolicyPage type="privacy" />}
       </main>
-      <Chatbot setPage={setPage} setFilters={setFilters} />
+      <Chatbot listingsData={platformListings} setPage={setPage} setFilters={setFilters} />
       <Footer setPage={setPage} />
     </>
   );
@@ -520,7 +520,7 @@ function PropertyTypeDropdown({ value, onChange }) {
         aria-expanded={open}
       >
         <span>{value || "Any type"}</span>
-        <span className="dropdown-arrow" aria-hidden="true">⌄</span>
+        <span className="dropdown-arrow" aria-hidden="true" />
       </button>
       {open && (
         <div className="location-menu selector-menu">
@@ -570,7 +570,7 @@ function PriceRangeDropdown({ minPrice, maxPrice, onChange }) {
         aria-expanded={open}
       >
         <span>{displayValue}</span>
-        <span className="dropdown-arrow" aria-hidden="true">⌄</span>
+        <span className="dropdown-arrow" aria-hidden="true" />
       </button>
       {open && (
         <div className="location-menu selector-menu">
@@ -628,7 +628,7 @@ function LocationDropdown({ value, onChange }) {
         aria-expanded={open}
       >
         <span>{value || "All Windhoek areas"}</span>
-        <span className="dropdown-arrow" aria-hidden="true">⌄</span>
+        <span className="dropdown-arrow" aria-hidden="true" />
       </button>
       {open && (
         <div className="location-menu">
@@ -1416,69 +1416,220 @@ function PolicyPage({ type }) {
   );
 }
 
-function Chatbot({ setPage, setFilters }) {
+function Chatbot({ listingsData, setPage, setFilters }) {
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState([
-    { from: "bot", text: "Hi, I can help you find rentals, student rooms, short stays, advertising options, or safety tips." },
+    { from: "bot", text: "Hi, I am the NamRent assistant. Ask me for rentals by area, budget, type, student housing, short stays, safety, or landlord listing steps." },
   ]);
 
   const quickActions = [
-    ["Student rentals below N$4,000", () => { setFilters((current) => ({ ...current, category: "Student rentals", maxPrice: "4000", minPrice: "" })); setPage("student"); return "Showing student rentals below N$4,000."; }],
-    ["Airbnb-style stays", () => { setFilters((current) => ({ ...current, category: "Short stays", maxPrice: "", minPrice: "" })); setPage("airbnb"); return "Showing Airbnb-style short stays and furnished guest rentals."; }],
-    ["Advertise", () => { setPage("advertise"); return "I opened the advertising packages page."; }],
-    ["Safety tips", () => { setPage("safety"); return "I opened rental safety tips. Always verify before paying deposits."; }],
+    "Student rooms under N$4,000",
+    "Compare Capital Residence and Winco",
+    "Short stays in Eros",
+    "How do landlords add listings?",
   ];
+
+  const findLocation = (lower) => {
+    if (lower.includes("cbd") || lower.includes("central")) return "Windhoek Central";
+    return locations.find((location) => lower.includes(location.toLowerCase())) || "";
+  };
+
+  const findCategory = (lower) => {
+    if (lower.includes("student") || lower.includes("campus") || lower.includes("residence")) return "Student rentals";
+    if (lower.includes("airbnb") || lower.includes("short stay") || lower.includes("short-stay") || lower.includes("nightly") || lower.includes("holiday")) return "Short stays";
+    if (lower.includes("family") || lower.includes("house") || lower.includes("townhouse")) return "Family homes";
+    if (lower.includes("luxury") || lower.includes("premium")) return "Luxury rentals";
+    if (lower.includes("cheap") || lower.includes("affordable") || lower.includes("low cost")) return "Affordable rentals";
+    return "";
+  };
+
+  const findType = (lower) => {
+    const aliases = [
+      ["bachelor", "Bachelor flat"],
+      ["shared", "Shared room"],
+      ["student accommodation", "Student accommodation"],
+      ["guest", "Guest suite"],
+      ["holiday", "Holiday apartment"],
+      ["short", "Short-term rental"],
+    ];
+    const alias = aliases.find(([term]) => lower.includes(term));
+    if (alias) return alias[1];
+    return propertyTypes.find((type) => lower.includes(type.toLowerCase())) || "";
+  };
+
+  const findPriceRange = (lower) => {
+    const numbers = [...lower.matchAll(/(?:n\$|nad)?\s*(\d[\d,\s]{2,})/g)]
+      .map((match) => Number(match[1].replace(/[,\s]/g, "")))
+      .filter((value) => value >= 500);
+    if (!numbers.length) return { minPrice: "", maxPrice: "" };
+    if (lower.includes("between") && numbers.length >= 2) {
+      return { minPrice: String(Math.min(numbers[0], numbers[1])), maxPrice: String(Math.max(numbers[0], numbers[1])) };
+    }
+    if (lower.includes("above") || lower.includes("over") || lower.includes("from") || lower.includes("minimum")) {
+      return { minPrice: String(numbers[0]), maxPrice: "" };
+    }
+    return { minPrice: "", maxPrice: String(Math.max(...numbers)) };
+  };
+
+  const parseRentalRequest = (text) => {
+    const lower = text.toLowerCase();
+    const { minPrice, maxPrice } = findPriceRange(lower);
+    return {
+      lower,
+      location: findLocation(lower),
+      category: findCategory(lower),
+      type: findType(lower),
+      minPrice,
+      maxPrice,
+      bedrooms: Number(lower.match(/(\d+)\s*(bed|bedroom|br)/)?.[1] || 0),
+      wantsNoDeposit: lower.includes("no deposit") || lower.includes("without deposit"),
+      wantsFurnished: lower.includes("furnished"),
+      wantsParking: lower.includes("parking"),
+      wantsUtilities: lower.includes("utilities") || lower.includes("water") || lower.includes("electricity"),
+      wantsWifi: lower.includes("wifi") || lower.includes("wi-fi"),
+      wantsSecurity: lower.includes("security") || lower.includes("secure") || lower.includes("safe complex"),
+      cheapest: lower.includes("cheap") || lower.includes("affordable") || lower.includes("lowest"),
+    };
+  };
+
+  const listingText = (listing) =>
+    [listing.title, listing.location, listing.category, listing.propertyType, listing.description, listing.furnished, listing.utilities, ...(listing.features ?? []), ...(listing.badges ?? [])]
+      .join(" ")
+      .toLowerCase();
+
+  const matchesRequest = (listing, request) => {
+    if (request.location && listing.location !== request.location) return false;
+    if (request.category && listing.category !== request.category) return false;
+    if (request.type && listing.propertyType !== request.type && !listing.propertyType.toLowerCase().includes(request.type.toLowerCase())) return false;
+    if (request.minPrice && listing.price < Number(request.minPrice)) return false;
+    if (request.maxPrice && listing.price > Number(request.maxPrice)) return false;
+    if (request.bedrooms && Number(listing.bedrooms) !== request.bedrooms) return false;
+    if (request.wantsNoDeposit && listing.deposit !== 0) return false;
+    const text = listingText(listing);
+    if (request.wantsFurnished && !text.includes("furnished")) return false;
+    if (request.wantsParking && Number(listing.parking) < 1 && !text.includes("parking")) return false;
+    if (request.wantsUtilities && !text.includes("utilit") && !text.includes("water") && !text.includes("electricity")) return false;
+    if (request.wantsWifi && !text.includes("wifi") && !text.includes("wi-fi")) return false;
+    if (request.wantsSecurity && !text.includes("security") && !text.includes("secure") && !text.includes("safe")) return false;
+    return true;
+  };
+
+  const rankListings = (items, request) =>
+    [...items].sort((a, b) => {
+      if (request.cheapest) return a.price - b.price;
+      return (b.popularity ?? 0) - (a.popularity ?? 0) || a.price - b.price;
+    });
+
+  const formatListingLine = (listing) =>
+    `${listing.title} - ${listing.location}, ${currency.format(listing.price).replace("NAD", "N$")} ${listing.pricePeriod ?? "per month"}`;
+
+  const findMentionedListings = (lower) => {
+    const knownNames = ["villa verdi", "mercury house", "capital residence", "winco residence"];
+    const exact = knownNames
+      .filter((name) => lower.includes(name))
+      .map((name) => listingsData.find((listing) => listing.title.toLowerCase().includes(name)))
+      .filter(Boolean);
+    if (exact.length) return exact;
+    return listingsData.filter((listing) => {
+      const titleWords = listing.title.toLowerCase().split(/\W+/).filter((word) => word.length > 4);
+      return titleWords.length >= 2 && titleWords.filter((word) => lower.includes(word)).length >= 2;
+    });
+  };
+
+  const openResultsPage = (request) => {
+    setFilters((current) => ({
+      ...current,
+      location: request.location,
+      type: request.type,
+      category: request.category,
+      minPrice: request.minPrice,
+      maxPrice: request.maxPrice,
+      sort: request.cheapest ? "lowest" : current.sort,
+    }));
+    if (request.category === "Student rentals") setPage("student");
+    else if (request.category === "Short stays") setPage("airbnb");
+    else setPage("rentals");
+  };
+
   const answerQuestion = (text) => {
     const lower = text.toLowerCase();
-    if (lower.includes("student") || lower.includes("campus") || lower.includes("residence")) {
+    const mentionedListings = findMentionedListings(lower);
+
+    if (lower.includes("compare") && mentionedListings.length >= 2) {
       setPage("student");
-      return "I opened Student Rentals. Listings include Villa Verdi, Mercury House, Capital Residence, and Winco Residence, with prices starting from about N$2,798 per month depending on provider and room type.";
+      return `Here is a quick comparison:\n${mentionedListings.slice(0, 3).map((listing) => `- ${formatListingLine(listing)}; ${listing.propertyType}; ${listing.bedrooms} bed option`).join("\n")}\nOpen Student Rentals to inspect the room options and confirm current availability.`;
     }
-    if (lower.includes("villa") || lower.includes("verdi")) {
-      setPage("student");
-      return "Villa Verdi is listed under Student Rentals as a female student residence in Windhoek West, with shared and single room options.";
+
+    if (lower.includes("landlord") || lower.includes("list my") || lower.includes("submit") || lower.includes("add listing")) {
+      setPage("dashboard");
+      return "For landlords: sign in or sign up as a Landlord, use Add listing, complete the property details, then NamRent/Realtor Agent reviews it. Once approved, the listing goes live and an approval email is generated.";
     }
-    if (lower.includes("mercury")) {
-      setPage("student");
-      return "Mercury House is listed under Student Rentals as managed student accommodation in Windhoek West. Confirm current prices and availability with the provider.";
+
+    if (lower.includes("approve") || lower.includes("approval")) {
+      return "Listings submitted by landlords stay pending first. A Realtor Agent reviews them, approves valid listings, and NamRent generates an approval email for the landlord.";
     }
-    if (lower.includes("capital")) {
-      setPage("student");
-      return "Capital Residence is in Windhoek CBD with single, twin, triple, and quad rooms. Published prices range from N$2,798 to N$4,310 per month.";
+
+    if (lower.includes("whatsapp") || lower.includes("contact") || lower.includes("call") || lower.includes("email")) {
+      return "Open any property card and use WhatsApp, Call, or Email on the details page. If the listing came from Facebook import, verify the advertiser before arranging payment.";
     }
-    if (lower.includes("winco")) {
-      setPage("student");
-      return "Winco Residence is in Windhoek CBD with twin and triple rooms. Published prices are around N$3,074 to N$3,242 per month.";
-    }
-    if (lower.includes("cheap") || lower.includes("affordable") || lower.includes("below")) {
-      setFilters((current) => ({ ...current, maxPrice: "4000", minPrice: "" }));
-      setPage("rentals");
-      return "I filtered rentals below N$4,000. You can narrow further by location or property type.";
-    }
-    if (lower.includes("whatsapp") || lower.includes("contact") || lower.includes("landlord")) {
-      return "Open any property card and use WhatsApp, Call, or Email on the details page. Always verify the property before paying a deposit.";
-    }
-    if (lower.includes("advert")) {
+
+    if (lower.includes("advert") || lower.includes("sponsor") || lower.includes("promote")) {
       setPage("advertise");
-      return "I opened Advertising. NamRent supports sponsored carousel placements and business advertising packages.";
+      return "I opened Advertising. NamRent can support sponsored carousel placements, business adverts, and property promotion packages.";
     }
-    if (lower.includes("safe") || lower.includes("deposit") || lower.includes("scam")) {
+
+    if (lower.includes("safe") || lower.includes("deposit") || lower.includes("scam") || lower.includes("fraud")) {
       setPage("safety");
-      return "I opened safety tips. View the property, confirm ownership or agent authority, and avoid paying deposits before verification.";
+      return "I opened safety tips. Before paying: view the property, confirm ownership or agent authority, ask for written terms, avoid pressure tactics, and never pay a deposit before verification.";
     }
-    if (lower.includes("airbnb") || lower.includes("short")) {
-      setPage("airbnb");
-      return "I opened Airbnb-style short stays for furnished nightly or weekly accommodation.";
+
+    if (lower.includes("map") || lower.includes("location page") || lower.includes("areas")) {
+      setPage("locations");
+      return "I opened Locations. Use the Windhoek map to click an area like Khomasdal, Katutura, Pioneers Park, or Kleine Kuppe and see matching rentals.";
     }
-    return "I can help with student residences, affordable rentals, locations, short stays, advertising, contacts, and safety. Try asking for student rentals in Windhoek or rentals below N$4,000.";
+
+    const request = parseRentalRequest(text);
+    const hasRentalIntent =
+      request.location ||
+      request.category ||
+      request.type ||
+      request.minPrice ||
+      request.maxPrice ||
+      request.bedrooms ||
+      request.wantsNoDeposit ||
+      request.wantsFurnished ||
+      request.wantsParking ||
+      request.wantsUtilities ||
+      request.wantsWifi ||
+      request.wantsSecurity ||
+      lower.includes("find") ||
+      lower.includes("rent") ||
+      lower.includes("recommend") ||
+      lower.includes("suggest");
+
+    if (hasRentalIntent) {
+      const matches = rankListings(listingsData.filter((listing) => matchesRequest(listing, request)), request);
+      openResultsPage(request);
+      if (matches.length) {
+        return `I found ${matches.length} matching rental${matches.length === 1 ? "" : "s"} and opened the best page for you.\n${matches.slice(0, 3).map((listing) => `- ${formatListingLine(listing)}`).join("\n")}`;
+      }
+      return "I applied those filters, but there are no exact matches yet. Try widening the area, increasing the budget, or removing one requirement like parking or furnished status.";
+    }
+
+    return "I can handle detailed rental questions. Try: student room under N$4,000 in Windhoek Central, bachelor flat in Khomasdal with parking, compare Capital Residence and Winco, or how do landlords add listings?";
   };
+
+  const sendAssistantReply = (userText) => {
+    const response = answerQuestion(userText);
+    setMessages((current) => [...current, { from: "user", text: userText }, { from: "bot", text: response }]);
+  };
+
   const submitQuestion = (event) => {
     event.preventDefault();
     const trimmed = question.trim();
     if (!trimmed) return;
-    const response = answerQuestion(trimmed);
-    setMessages((current) => [...current, { from: "user", text: trimmed }, { from: "bot", text: response }]);
+    sendAssistantReply(trimmed);
     setQuestion("");
   };
 
@@ -1487,15 +1638,20 @@ function Chatbot({ setPage, setFilters }) {
       {open && (
         <section className="chat-window" aria-label="NamRent assistant">
           <header>
-            <strong>NamRent Assistant</strong>
+            <div>
+              <strong>NamRent Assistant</strong>
+              <span>Search, compare, and rental safety</span>
+            </div>
             <button onClick={() => setOpen(false)} aria-label="Close chat">x</button>
           </header>
           <div className="chat-messages">
-            {messages.map((message, index) => <p className={message.from} key={`${message.text}-${index}`}>{message.text}</p>)}
+            {messages.map((message, index) => (
+              <p className={`chat-message ${message.from}`} key={`${message.text}-${index}`}>{message.text}</p>
+            ))}
           </div>
           <div className="quick-replies">
-            {quickActions.map(([label, action]) => (
-              <button key={label} onClick={() => setMessages((current) => [...current, { from: "bot", text: action() }])}>{label}</button>
+            {quickActions.map((label) => (
+              <button key={label} onClick={() => sendAssistantReply(label)}>{label}</button>
             ))}
           </div>
           <form className="chat-input" onSubmit={submitQuestion}>
@@ -1509,7 +1665,7 @@ function Chatbot({ setPage, setFilters }) {
         </section>
       )}
       <button className="chat-button" onClick={() => setOpen((current) => !current)} aria-label="Open NamRent assistant">
-        Chat
+        Ask
       </button>
     </div>
   );
