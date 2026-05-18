@@ -9,7 +9,7 @@ function getListingStatusInfo(status) {
   if (status === "approved") {
     return {
       label: "Approved",
-      image: "✅",
+      image: "OK",
       message: "Your listing is live on NamRent.",
     };
   }
@@ -17,14 +17,14 @@ function getListingStatusInfo(status) {
   if (status === "rejected") {
     return {
       label: "Rejected",
-      image: "❌",
+      image: "NO",
       message: "Your listing was rejected. Please check the admin note.",
     };
   }
 
   return {
     label: "Pending Review",
-    image: "⏳",
+    image: "...",
     message: "Your listing is waiting for NamRent review.",
   };
 }
@@ -127,49 +127,72 @@ function AdvertiserDashboard({ currentUser }) {
               <div className="my-listings-list">
                 {myListings.map((listing) => {
                   const statusInfo = getListingStatusInfo(listing.status);
+                  const mainImage =
+                    listing.advertiserPhotos?.[0] ||
+                    listing.image ||
+                    listing.coverImage ||
+                    "";
 
                   return (
-                    <article className="mini-listing-card" key={listing.id}>
-                      <div className="mini-listing-top">
-                        <div className="status-icon">{statusInfo.image}</div>
-
-                        <div>
-                          <h3>{listing.title}</h3>
-                          <p>
-                            {listing.area}, {listing.location}
-                          </p>
-                          <strong>N${Number(listing.price).toLocaleString()}</strong>
-                        </div>
+                    <article className="advertiser-listing-card" key={listing.id}>
+                      <div className="advertiser-listing-image">
+                        {mainImage ? (
+                          <img src={mainImage} alt={listing.title} />
+                        ) : (
+                          <span>{statusInfo.image}</span>
+                        )}
                       </div>
 
-                      <span className={`status-pill ${listing.status}`}>
-                        {statusInfo.label}
-                      </span>
+                      <div className="advertiser-listing-content">
+                        <div className="advertiser-listing-top">
+                          <h3>{listing.title}</h3>
+                          <span className={`status-pill ${listing.status}`}>
+                            {statusInfo.label}
+                          </span>
+                        </div>
 
-                      <p className="small-note">{statusInfo.message}</p>
-
-                      {listing.editedAfterSubmission && (
-                        <p className="edit-warning">
-                          Edited after submission. Waiting for admin review again.
+                        <p>
+                          {listing.area}, {listing.location}
                         </p>
-                      )}
 
-                      {listing.adminNote && (
-                        <p className="admin-feedback">
-                          <strong>Admin note:</strong> {listing.adminNote}
-                        </p>
-                      )}
+                        <strong>
+                          N${Number(listing.price || 0).toLocaleString()} / month
+                        </strong>
 
-                      <button className="secondary-btn">
-                        Update listing
-                      </button>
+                        <div className="listing-mini-details">
+                          <span>{listing.bedrooms} bed</span>
+                          <span>{listing.bathrooms} bath</span>
+                          <span>
+                            Deposit: N${Number(listing.deposit || 0).toLocaleString()}
+                          </span>
+                          <span>Available: {listing.availableFrom || "Not set"}</span>
+                        </div>
 
-                      <button
-                        className="text-danger-btn"
-                        onClick={() => handleDeleteListing(listing.id)}
-                      >
-                        Delete
-                      </button>
+                        <p className="small-note">{statusInfo.message}</p>
+
+                        {listing.editedAfterSubmission && (
+                          <p className="edit-warning">
+                            Edited after submission. Waiting for NamRent admin review again.
+                          </p>
+                        )}
+
+                        {listing.adminNote && (
+                          <p className="admin-feedback">
+                            <strong>Admin note:</strong> {listing.adminNote}
+                          </p>
+                        )}
+
+                        <div className="advertiser-listing-actions">
+                          <button className="secondary-btn">Update listing</button>
+
+                          <button
+                            className="text-danger-btn"
+                            onClick={() => handleDeleteListing(listing.id)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
                     </article>
                   );
                 })}

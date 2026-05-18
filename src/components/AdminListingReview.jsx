@@ -5,12 +5,14 @@ import {
   rejectListing,
   uploadNamRentVerificationPhotos,
 } from "../services/listingService.js";
+import ListingPhotoGallery from "./ListingPhotoGallery.jsx";
 
 function AdminListingReview({ currentUser }) {
   const [listings, setListings] = useState([]);
   const [activeTab, setActiveTab] = useState("pending_review");
   const [selectedNotes, setSelectedNotes] = useState({});
   const [verificationFiles, setVerificationFiles] = useState({});
+  const [adminEdits, setAdminEdits] = useState({});
   const [isUpdating, setIsUpdating] = useState("");
 
   useEffect(() => {
@@ -53,6 +55,26 @@ function AdminListingReview({ currentUser }) {
     }));
   };
 
+  const updateAdminEdit = (listingId, field, value) => {
+    setAdminEdits((previous) => ({
+      ...previous,
+      [listingId]: {
+        ...previous[listingId],
+        [field]: value,
+      },
+    }));
+  };
+
+  const getEditableType = (listing) =>
+    adminEdits[listing.id]?.type ||
+    (listing.type && listing.type !== "Uncategorized" ? listing.type : "Apartment");
+
+  const getEditableCategory = (listing) =>
+    adminEdits[listing.id]?.category ||
+    (listing.category && listing.category !== "Uncategorized"
+      ? listing.category
+      : "Long-term rental");
+
   const handleApprove = async (listing) => {
     try {
       setIsUpdating(listing.id);
@@ -63,7 +85,11 @@ function AdminListingReview({ currentUser }) {
         await uploadNamRentVerificationPhotos(listing.id, files);
       }
 
-      await approveListing(listing.id, currentUser);
+      await approveListing(
+        listing.id,
+        currentUser,
+        adminEdits[listing.id] || {}
+      );
     } catch (error) {
       alert(error.message || "Failed to approve listing.");
     } finally {
@@ -166,17 +192,10 @@ function AdminListingReview({ currentUser }) {
 
                   <p>{listing.description}</p>
 
-                  {listing.advertiserPhotos?.length > 0 && (
-                    <div className="listing-photo-grid">
-                      {listing.advertiserPhotos.map((photoUrl) => (
-                        <img
-                          key={photoUrl}
-                          src={photoUrl}
-                          alt="Advertiser uploaded property"
-                        />
-                      ))}
-                    </div>
-                  )}
+                  <ListingPhotoGallery
+                    photos={listing.advertiserPhotos || []}
+                    title={listing.title}
+                  />
                 </div>
 
                 <div className="admin-listing-meta">
@@ -205,6 +224,22 @@ function AdminListingReview({ currentUser }) {
                   <p>
                     <strong>Rooms:</strong> {listing.bedrooms} bed,{" "}
                     {listing.bathrooms} bath
+                  </p>
+                  <p>
+                    <strong>Deposit:</strong> N$
+                    {Number(listing.deposit || 0).toLocaleString()}
+                  </p>
+                  <p>
+                    <strong>Available:</strong>{" "}
+                    {listing.availableFrom || "Not set"}
+                  </p>
+                  <p>
+                    <strong>Water:</strong>{" "}
+                    {listing.waterIncluded || "not provided"}
+                  </p>
+                  <p>
+                    <strong>Electricity:</strong>{" "}
+                    {listing.electricityIncluded || "not provided"}
                   </p>
                   <p>
                     <strong>Verification:</strong>{" "}
@@ -245,17 +280,47 @@ function AdminListingReview({ currentUser }) {
               {listing.namrentVerificationPhotos?.length > 0 && (
                 <div className="verification-photo-section">
                   <h3>NamRent verification photos</h3>
-                  <div className="listing-photo-grid">
-                    {listing.namrentVerificationPhotos.map((photoUrl) => (
-                      <img
-                        key={photoUrl}
-                        src={photoUrl}
-                        alt="NamRent verification"
-                      />
-                    ))}
-                  </div>
+                  <ListingPhotoGallery
+                    photos={listing.namrentVerificationPhotos || []}
+                    title={`${listing.title} verification`}
+                  />
                 </div>
               )}
+
+              <div className="admin-category-grid">
+                <label>
+                  Property type
+                  <select
+                    value={getEditableType(listing)}
+                    onChange={(event) =>
+                      updateAdminEdit(listing.id, "type", event.target.value)
+                    }
+                  >
+                    <option value="Apartment">Apartment</option>
+                    <option value="Flat">Flat</option>
+                    <option value="Room">Room</option>
+                    <option value="House">House</option>
+                    <option value="Townhouse">Townhouse</option>
+                    <option value="Student accommodation">Student accommodation</option>
+                  </select>
+                </label>
+
+                <label>
+                  Rental category
+                  <select
+                    value={getEditableCategory(listing)}
+                    onChange={(event) =>
+                      updateAdminEdit(listing.id, "category", event.target.value)
+                    }
+                  >
+                    <option value="Long-term rental">Long-term rental</option>
+                    <option value="Student rental">Student rental</option>
+                    <option value="Short stay">Short stay</option>
+                    <option value="Shared accommodation">Shared accommodation</option>
+                    <option value="Family rental">Family rental</option>
+                  </select>
+                </label>
+              </div>
 
               <div className="admin-actions">
                 {activeTab !== "approved" && (

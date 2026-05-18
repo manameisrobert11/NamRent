@@ -5,6 +5,7 @@ import GoogleSignIn from "./components/GoogleSignIn.jsx";
 import AdvertiserDashboard from "./components/AdvertiserDashboard.jsx";
 import AdminListingReview from "./components/AdminListingReview.jsx";
 import WindhoekMap from "./components/WindhoekMap.jsx";
+import ListingPhotoGallery from "./components/ListingPhotoGallery.jsx";
 import { listenToApprovedListings } from "./services/listingService.js";
 import { USER_ROLES, getRoleLabel } from "./authRoles.js";
 import { listings, locations, futureLocations, propertyTypes, priceRanges } from "./namrentData.js";
@@ -96,6 +97,7 @@ function getPublicCategoryLabel(category) {
     "Short stay": "Short stays",
     "Long-term rental": "Affordable rentals",
     "Shared accommodation": "Student rentals",
+    "Family rental": "Family homes",
   };
 
   return categoryMap[category] || category || "Affordable rentals";
@@ -108,6 +110,10 @@ function normalizeApprovedFirestoreListing(listing, index) {
     : fallback.gallery || [fallback.image].filter(Boolean);
   const category = getPublicCategoryLabel(listing.category);
   const hasNamRentVerification = listing.verificationStatus === "verified_by_namrent";
+  const utilities = [
+    listing.waterIncluded ? `Water: ${listing.waterIncluded}` : "",
+    listing.electricityIncluded ? `Electricity: ${listing.electricityIncluded}` : "",
+  ].filter(Boolean).join("; ");
 
   return {
     id: listing.id,
@@ -115,6 +121,8 @@ function normalizeApprovedFirestoreListing(listing, index) {
     description: listing.description || fallback.description,
     price: Number(listing.price || fallback.price || 0),
     deposit: listing.deposit ?? 0,
+    waterIncluded: listing.waterIncluded,
+    electricityIncluded: listing.electricityIncluded,
     location: listing.area || listing.location || fallback.location,
     city: listing.location || fallback.city || "Windhoek",
     propertyType: listing.type || fallback.propertyType || "Rental",
@@ -123,7 +131,7 @@ function normalizeApprovedFirestoreListing(listing, index) {
     bathrooms: listing.bathrooms ?? fallback.bathrooms ?? 0,
     parking: listing.parking ?? 0,
     furnished: listing.furnished || "Confirm with advertiser",
-    utilities: listing.utilities || "Confirm water and electricity with advertiser",
+    utilities: listing.utilities || utilities || "Confirm water and electricity with advertiser",
     availableFrom: listing.availableFrom || "Confirm with advertiser",
     pricePeriod: "per month",
     badges: [
@@ -152,6 +160,10 @@ function normalizeApprovedFirestoreListing(listing, index) {
     popularity: 88,
     firestoreListing: listing,
   };
+}
+
+function getListingArea(listing) {
+  return listing.area || listing.location || "";
 }
 
 function isAdminUser(user) {
@@ -229,13 +241,24 @@ function App() {
       const normalizedListings = approvedListings.map((listing, index) =>
         normalizeApprovedFirestoreListing(listing, index)
       );
+      const combinedListings = [
+        ...normalizedListings,
+        ...listings.filter(
+          (sampleListing) =>
+            !normalizedListings.some(
+              (firestoreListing) =>
+                firestoreListing.title === sampleListing.title &&
+                getListingArea(firestoreListing) === getListingArea(sampleListing)
+            )
+        ),
+      ];
 
-      if (normalizedListings.length > 0) {
-        setPlatformListings(normalizedListings);
+      if (combinedListings.length > 0) {
+        setPlatformListings(combinedListings);
         setSelectedListingId((currentId) =>
-          normalizedListings.some((listing) => listing.id === currentId)
+          combinedListings.some((listing) => listing.id === currentId)
             ? currentId
-            : normalizedListings[0].id
+            : combinedListings[0].id
         );
       } else {
         setPlatformListings(listings);
@@ -876,10 +899,17 @@ function ListingGrid({ listingsToShow, goToListing }) {
 }
 
 function ListingCard({ listing, goToListing }) {
+  const mainImage =
+    listing.advertiserPhotos?.[0] ||
+    listing.namrentVerificationPhotos?.[0] ||
+    listing.image ||
+    listing.coverImage ||
+    "/Christ_Church_in_Windhoek,_Namibia.jpg";
+
   return (
     <article className="listing-card">
       <button className="image-button" onClick={() => goToListing(listing.id)}>
-        <img src={listing.image} alt={listing.title} />
+        <img src={mainImage} alt={listing.title} />
         {listing.isFeatured && <span className="image-badge">Featured</span>}
       </button>
       <div className="card-body">
@@ -914,6 +944,11 @@ function ListingCard({ listing, goToListing }) {
 function PropertyDetails({ currentUser, listing, onViewingRequest, setPage }) {
   const [requestOpen, setRequestOpen] = useState(false);
   const [requestSent, setRequestSent] = useState(false);
+  const detailPhotos = [
+    ...(listing.advertiserPhotos || []),
+    ...(listing.namrentVerificationPhotos || []),
+    ...(listing.gallery || []),
+  ];
   const handleViewingRequest = (requestData) => {
     onViewingRequest(listing, requestData);
     setRequestSent(true);
@@ -923,10 +958,7 @@ function PropertyDetails({ currentUser, listing, onViewingRequest, setPage }) {
   return (
     <section className="details-page">
       <div className="details-gallery">
-        <img className="main-photo" src={listing.gallery[0]} alt={listing.title} />
-        <div className="thumb-grid">
-          {listing.gallery.slice(1).map((image) => <img key={image} src={image} alt="" />)}
-        </div>
+        <ListingPhotoGallery photos={detailPhotos} title={listing.title} />
       </div>
       <div className="details-layout">
         <article className="details-main">

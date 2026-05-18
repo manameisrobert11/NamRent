@@ -6,10 +6,12 @@ const initialForm = {
   location: "Windhoek",
   area: "",
   price: "",
+  deposit: "",
+  waterIncluded: "no",
+  electricityIncluded: "no",
+  availableFrom: "",
   bedrooms: "",
   bathrooms: "",
-  type: "Apartment",
-  category: "Long-term rental",
   description: "",
   contactPhone: "",
   contactWhatsApp: "",
@@ -34,6 +36,12 @@ function CreateListingForm({ currentUser, onListingCreated }) {
     if (!formData.area.trim()) return "Please enter the suburb or area.";
     if (!formData.price || Number(formData.price) <= 0) {
       return "Please enter a valid monthly price.";
+    }
+    if (formData.deposit === "" || Number(formData.deposit) < 0) {
+      return "Please enter the deposit amount. Use 0 if there is no deposit.";
+    }
+    if (!formData.availableFrom) {
+      return "Please select when the rental is available from.";
     }
     if (!formData.bedrooms || Number(formData.bedrooms) < 0) {
       return "Please enter the number of bedrooms.";
@@ -87,13 +95,13 @@ function CreateListingForm({ currentUser, onListingCreated }) {
   };
 
   return (
-    <form className="listing-form" onSubmit={handleSubmit}>
+    <form className="listing-form" onSubmit={handleSubmit} autoComplete="off">
       <div className="form-header">
         <p className="eyebrow">Advertiser Dashboard</p>
         <h2>Create a new rental listing</h2>
         <p>
-          Add the rental details below. New listings will be reviewed before
-          being shown publicly on NamRent.
+          Add the property facts below. NamRent will review and categorize the
+          listing before it appears publicly.
         </p>
       </div>
 
@@ -107,7 +115,7 @@ function CreateListingForm({ currentUser, onListingCreated }) {
             type="text"
             value={formData.title}
             onChange={(event) => updateField("title", event.target.value)}
-            placeholder="Example: Modern 2-bedroom flat in Windhoek West"
+            placeholder="Example: 2-bedroom flat in Windhoek West"
           />
         </label>
 
@@ -147,6 +155,52 @@ function CreateListingForm({ currentUser, onListingCreated }) {
         </label>
 
         <label>
+          Deposit amount NAD
+          <input
+            type="number"
+            min="0"
+            value={formData.deposit}
+            onChange={(event) => updateField("deposit", event.target.value)}
+            placeholder="Example: 6500"
+          />
+        </label>
+
+        <label>
+          Available from
+          <input
+            type="date"
+            value={formData.availableFrom}
+            onChange={(event) => updateField("availableFrom", event.target.value)}
+          />
+        </label>
+
+        <label>
+          Water included?
+          <select
+            value={formData.waterIncluded}
+            onChange={(event) => updateField("waterIncluded", event.target.value)}
+          >
+            <option value="yes">Yes, water is included</option>
+            <option value="no">No, water is excluded</option>
+            <option value="partial">Partially included</option>
+          </select>
+        </label>
+
+        <label>
+          Electricity included?
+          <select
+            value={formData.electricityIncluded}
+            onChange={(event) =>
+              updateField("electricityIncluded", event.target.value)
+            }
+          >
+            <option value="yes">Yes, electricity is included</option>
+            <option value="no">No, electricity is excluded</option>
+            <option value="prepaid">Prepaid electricity</option>
+          </select>
+        </label>
+
+        <label>
           Bedrooms
           <input
             type="number"
@@ -166,34 +220,6 @@ function CreateListingForm({ currentUser, onListingCreated }) {
             onChange={(event) => updateField("bathrooms", event.target.value)}
             placeholder="Example: 1"
           />
-        </label>
-
-        <label>
-          Property type
-          <select
-            value={formData.type}
-            onChange={(event) => updateField("type", event.target.value)}
-          >
-            <option value="Apartment">Apartment</option>
-            <option value="Flat">Flat</option>
-            <option value="Room">Room</option>
-            <option value="House">House</option>
-            <option value="Townhouse">Townhouse</option>
-            <option value="Student accommodation">Student accommodation</option>
-          </select>
-        </label>
-
-        <label>
-          Rental category
-          <select
-            value={formData.category}
-            onChange={(event) => updateField("category", event.target.value)}
-          >
-            <option value="Long-term rental">Long-term rental</option>
-            <option value="Student rental">Student rental</option>
-            <option value="Short stay">Short stay</option>
-            <option value="Shared accommodation">Shared accommodation</option>
-          </select>
         </label>
 
         <label>
@@ -224,7 +250,7 @@ function CreateListingForm({ currentUser, onListingCreated }) {
         <textarea
           value={formData.description}
           onChange={(event) => updateField("description", event.target.value)}
-          placeholder="Describe the property, nearby places, rules, deposit, water/electricity, parking, and who it is suitable for."
+          placeholder="Describe the property, nearby places, rules, parking, and who it is suitable for."
           rows="5"
         />
       </label>

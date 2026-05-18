@@ -29,10 +29,14 @@ export async function createListing(listingData, currentUser, imageFiles = []) {
     location: listingData.location.trim(),
     area: listingData.area.trim(),
     price: Number(listingData.price),
+    deposit: Number(listingData.deposit || 0),
+    waterIncluded: listingData.waterIncluded,
+    electricityIncluded: listingData.electricityIncluded,
+    availableFrom: listingData.availableFrom,
     bedrooms: Number(listingData.bedrooms),
     bathrooms: Number(listingData.bathrooms),
-    type: listingData.type,
-    category: listingData.category,
+    type: "Uncategorized",
+    category: "Uncategorized",
     description: listingData.description.trim(),
     contactPhone: listingData.contactPhone.trim(),
     contactWhatsApp: listingData.contactWhatsApp.trim(),
@@ -85,10 +89,12 @@ export async function updateAdvertiserListing(
     location: listingData.location.trim(),
     area: listingData.area.trim(),
     price: Number(listingData.price),
+    deposit: Number(listingData.deposit || 0),
+    waterIncluded: listingData.waterIncluded,
+    electricityIncluded: listingData.electricityIncluded,
+    availableFrom: listingData.availableFrom,
     bedrooms: Number(listingData.bedrooms),
     bathrooms: Number(listingData.bathrooms),
-    type: listingData.type,
-    category: listingData.category,
     description: listingData.description.trim(),
     contactPhone: listingData.contactPhone.trim(),
     contactWhatsApp: listingData.contactWhatsApp.trim(),
@@ -120,12 +126,16 @@ export async function uploadNamRentVerificationPhotos(listingId, files) {
   return photoUrls;
 }
 
-export async function approveListing(listingId, currentUser) {
+export async function approveListing(listingId, currentUser, adminEdits = {}) {
   await updateDoc(doc(db, LISTINGS_COLLECTION, listingId), {
     status: "approved",
     featured: true,
     needsAdminReview: false,
     editedAfterSubmission: false,
+
+    type: adminEdits.type || "Apartment",
+    category: adminEdits.category || "Long-term rental",
+
     approvedBy: currentUser?.uid || "",
     approvedByName: currentUser?.name || currentUser?.email || "NamRent Admin",
     approvedAt: serverTimestamp(),
