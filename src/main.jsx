@@ -335,14 +335,14 @@ function Header({ page, setPage, currentUser, setCurrentUser }) {
       </div>
       <nav className="mobile-nav" aria-label="Mobile navigation">
         {[
+          ["rentals", "logo"],
           ["home", "Home"],
-          ["rentals", "Search"],
           ["student", "Student"],
           ["airbnb", "Stays"],
           [currentUser?.role === "landlord" ? "dashboard" : "advertise", currentUser?.role === "landlord" ? "Add" : "Ads"],
         ].map(([key, label]) => (
-          <button className={page === key ? "active" : ""} key={key} onClick={() => setPage(key)}>
-            {label}
+          <button className={label === "logo" ? `mobile-logo-tab ${page === key ? "active" : ""}` : page === key ? "active" : ""} key={key} onClick={() => setPage(key)}>
+            {label === "logo" ? <img src="/namrent-logo.png" alt="Rentals" /> : label}
           </button>
         ))}
       </nav>
@@ -906,8 +906,8 @@ function RentalFlashcards({ eyebrow, title, text, flashListings, goToListing, cl
   const [pageIndex, setPageIndex] = useState(0);
   const [dragStart, setDragStart] = useState(null);
   const [dragOffset, setDragOffset] = useState(0);
-  const bufferCards = 4;
-  const maxPage = Math.max(0, flashListings.length - bufferCards);
+  const [visibleCards, setVisibleCards] = useState(4);
+  const maxPage = Math.max(0, flashListings.length - visibleCards);
   const showPrevious = () => setPageIndex((current) => (current <= 0 ? maxPage : current - 1));
   const showNext = () => setPageIndex((current) => (current >= maxPage ? 0 : current + 1));
   const endDrag = () => {
@@ -922,6 +922,21 @@ function RentalFlashcards({ eyebrow, title, text, flashListings, goToListing, cl
   useEffect(() => {
     setPageIndex(0);
   }, [flashListings]);
+
+  useEffect(() => {
+    const updateVisibleCards = () => {
+      if (window.innerWidth <= 720) setVisibleCards(1);
+      else if (window.innerWidth <= 1100) setVisibleCards(2);
+      else setVisibleCards(4);
+    };
+    updateVisibleCards();
+    window.addEventListener("resize", updateVisibleCards);
+    return () => window.removeEventListener("resize", updateVisibleCards);
+  }, []);
+
+  useEffect(() => {
+    setPageIndex((current) => Math.min(current, maxPage));
+  }, [maxPage]);
 
   return (
     <section className={compact ? "room-flash-section compact" : `room-flash-section ${className}`.trim()}>

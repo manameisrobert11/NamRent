@@ -256,6 +256,20 @@ img {
   padding: 9px 4px;
 }
 
+.mobile-nav .mobile-logo-tab {
+  align-items: center;
+  display: inline-flex;
+  justify-content: center;
+  padding: 4px;
+}
+
+.mobile-nav .mobile-logo-tab img {
+  height: 32px;
+  max-width: 82px;
+  object-fit: contain;
+  width: 100%;
+}
+
 .hero {
   background:
     linear-gradient(180deg, rgba(6, 38, 82, 0.84), rgba(8, 53, 107, 0.76)),
@@ -1022,6 +1036,7 @@ textarea {
   position: absolute;
   pointer-events: auto;
   top: 34%;
+  transform: translateY(-50%);
   width: 54px;
   z-index: 2;
 }
@@ -2258,6 +2273,11 @@ textarea {
     min-height: 42px;
   }
 
+  .mobile-nav .mobile-logo-tab img {
+    height: 30px;
+    max-width: 76px;
+  }
+
   .mobile-nav button.active {
     background: var(--blue-100);
   }
@@ -2401,7 +2421,7 @@ textarea {
     margin-left: -16px;
     margin-right: -16px;
     --room-edge-space: 16px;
-    --room-card-width: calc(100% - (var(--room-edge-space) * 2));
+    --room-card-width: min(82vw, 330px);
   }
 
   .room-flash-track {
@@ -2410,20 +2430,19 @@ textarea {
   }
 
   .room-scroll-button {
-    bottom: -4px;
     border-width: 3px;
     font-size: 1.55rem;
     height: 44px;
-    top: auto;
+    top: 34%;
     width: 44px;
   }
 
   .room-scroll-button.left {
-    left: 10px;
+    left: 8px;
   }
 
   .room-scroll-button.right {
-    right: 10px;
+    right: 8px;
   }
 
   .details-gallery {
@@ -2516,6 +2535,10 @@ textarea {
 
   .room-flash-card {
     gap: 10px;
+  }
+
+  .room-flash-viewport {
+    --room-card-width: min(80vw, 305px);
   }
 
   .room-flash-card img {
