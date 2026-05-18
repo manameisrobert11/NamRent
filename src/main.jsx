@@ -5,6 +5,7 @@ import GoogleSignIn from "./components/GoogleSignIn.jsx";
 import AdvertiserDashboard from "./components/AdvertiserDashboard.jsx";
 import AdminListingReview from "./components/AdminListingReview.jsx";
 import WindhoekMap from "./components/WindhoekMap.jsx";
+import { listenToApprovedListings } from "./services/listingService.js";
 import { USER_ROLES, getRoleLabel } from "./authRoles.js";
 import { listings, locations, futureLocations, propertyTypes, priceRanges } from "./namrentData.js";
 
@@ -89,6 +90,70 @@ function getPersonalizedFeaturedListings(allListings, profile, limit = 12) {
   return [...new Map([...ranked, ...featured].map((listing) => [listing.id, listing])).values()].slice(0, limit);
 }
 
+function getPublicCategoryLabel(category) {
+  const categoryMap = {
+    "Student rental": "Student rentals",
+    "Short stay": "Short stays",
+    "Long-term rental": "Affordable rentals",
+    "Shared accommodation": "Student rentals",
+  };
+
+  return categoryMap[category] || category || "Affordable rentals";
+}
+
+function normalizeApprovedFirestoreListing(listing, index) {
+  const fallback = listings[index % listings.length] || listings[0];
+  const photos = listing.advertiserPhotos?.length
+    ? listing.advertiserPhotos
+    : fallback.gallery || [fallback.image].filter(Boolean);
+  const category = getPublicCategoryLabel(listing.category);
+  const hasNamRentVerification = listing.verificationStatus === "verified_by_namrent";
+
+  return {
+    id: listing.id,
+    title: listing.title || fallback.title,
+    description: listing.description || fallback.description,
+    price: Number(listing.price || fallback.price || 0),
+    deposit: listing.deposit ?? 0,
+    location: listing.area || listing.location || fallback.location,
+    city: listing.location || fallback.city || "Windhoek",
+    propertyType: listing.type || fallback.propertyType || "Rental",
+    category,
+    bedrooms: listing.bedrooms ?? fallback.bedrooms ?? 0,
+    bathrooms: listing.bathrooms ?? fallback.bathrooms ?? 0,
+    parking: listing.parking ?? 0,
+    furnished: listing.furnished || "Confirm with advertiser",
+    utilities: listing.utilities || "Confirm water and electricity with advertiser",
+    availableFrom: listing.availableFrom || "Confirm with advertiser",
+    pricePeriod: "per month",
+    badges: [
+      "NamRent Approved",
+      hasNamRentVerification ? "Verified by NamRent" : "",
+      listing.category || category,
+    ].filter(Boolean),
+    image: photos[0] || fallback.image,
+    gallery: photos.length ? photos : fallback.gallery,
+    contact: {
+      name: listing.ownerName || "NamRent Advertiser",
+      phone: listing.contactPhone || "Call advertiser unavailable",
+      whatsapp: listing.contactWhatsApp || "",
+      email: listing.ownerEmail || "listings@namrent.na",
+    },
+    features: [
+      "Advertiser submitted",
+      listing.area || listing.location || "Namibia",
+      listing.type || "Rental property",
+      listing.category || "Approved listing",
+    ],
+    safety: "This listing was approved through the NamRent review flow. Confirm viewing details before making any payment.",
+    status: listing.status,
+    verificationStatus: listing.verificationStatus,
+    isFeatured: listing.featured ?? true,
+    popularity: 88,
+    firestoreListing: listing,
+  };
+}
+
 function isAdminUser(user) {
   return user?.role === USER_ROLES.ADMIN || user?.role === "agent";
 }
@@ -158,6 +223,27 @@ function App() {
   useEffect(() => {
     setVisitProfile(readVisitProfile(currentUser));
   }, [currentUser?.email]);
+
+  useEffect(() => {
+    const unsubscribe = listenToApprovedListings((approvedListings) => {
+      const normalizedListings = approvedListings.map((listing, index) =>
+        normalizeApprovedFirestoreListing(listing, index)
+      );
+
+      if (normalizedListings.length > 0) {
+        setPlatformListings(normalizedListings);
+        setSelectedListingId((currentId) =>
+          normalizedListings.some((listing) => listing.id === currentId)
+            ? currentId
+            : normalizedListings[0].id
+        );
+      } else {
+        setPlatformListings(listings);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const submitListingForApproval = (formListing) => {
     const pending = {

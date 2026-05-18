@@ -279,8 +279,8 @@ img {
 
 .hero {
   background:
-    linear-gradient(180deg, rgba(6, 38, 82, 0.84), rgba(8, 53, 107, 0.76)),
-    url("https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1800&q=80") center/cover;
+    linear-gradient(180deg, rgba(6, 38, 82, 0.78), rgba(8, 53, 107, 0.68)),
+    url("/Christ_Church_in_Windhoek,_Namibia.jpg") center/cover;
   color: var(--white);
   min-height: 520px;
   padding: clamp(46px, 6vw, 78px) clamp(18px, 4vw, 56px) 82px;
@@ -2670,6 +2670,30 @@ textarea {
   gap: 18px;
 }
 
+.admin-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.admin-tabs button {
+  background: var(--white);
+  border: 1px solid #d4dfed;
+  border-radius: 999px;
+  color: var(--blue-900);
+  cursor: pointer;
+  font-weight: 900;
+  min-height: 42px;
+  padding: 10px 16px;
+}
+
+.admin-tabs button.active {
+  background: var(--blue-900);
+  border-color: var(--blue-900);
+  color: var(--white);
+}
+
 .admin-listing-card {
   background: var(--white);
   border: 1px solid #e3edf8;
@@ -2682,6 +2706,22 @@ textarea {
   display: grid;
   gap: 22px;
   grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.6fr);
+}
+
+.admin-card-topline {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.edit-alert-pill {
+  background: #fff1d6;
+  border-radius: 999px;
+  color: #9a5b00;
+  font-size: 0.78rem;
+  font-weight: 900;
+  padding: 5px 11px;
 }
 
 .admin-listing-card h2 {
@@ -2723,6 +2763,7 @@ textarea {
   margin-top: 18px;
 }
 
+.admin-note-field input,
 .admin-note-field textarea {
   background: #fbfdff;
   border: 1px solid #d4dfed;
@@ -2735,9 +2776,44 @@ textarea {
   width: 100%;
 }
 
+.admin-note-field small,
+.full-width-field small {
+  color: var(--muted);
+  font-weight: 700;
+  line-height: 1.45;
+}
+
 .admin-note-field textarea:focus {
   border-color: var(--blue-700);
   box-shadow: 0 0 0 3px rgba(13, 79, 158, 0.12);
+}
+
+.listing-photo-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  margin-top: 16px;
+}
+
+.listing-photo-grid img {
+  aspect-ratio: 4 / 3;
+  border: 1px solid #d4dfed;
+  border-radius: 8px;
+  object-fit: cover;
+  width: 100%;
+}
+
+.verification-photo-section {
+  background: #f7fbff;
+  border: 1px solid #dce9f7;
+  border-radius: 8px;
+  margin-top: 16px;
+  padding: 16px;
+}
+
+.verification-photo-section h3 {
+  color: var(--blue-900);
+  margin: 0;
 }
 
 .admin-actions {
@@ -2792,6 +2868,41 @@ textarea {
 .status-pill.verified {
   background: #ecfdf3;
   color: #027a48;
+}
+
+.status-icon {
+  background: #f1f7ff;
+  border-radius: 999px;
+  display: grid;
+  flex: 0 0 auto;
+  font-size: 1.35rem;
+  height: 42px;
+  place-items: center;
+  width: 42px;
+}
+
+.mini-listing-top {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+}
+
+.edit-warning {
+  background: #fff7df;
+  border: 1px solid #ffe3a3;
+  border-radius: 7px;
+  color: #946200;
+  font-weight: 800;
+  margin: 0;
+  padding: 10px;
+}
+
+.admin-feedback {
+  background: #f7fbff;
+  border: 1px solid #dce9f7;
+  border-radius: 7px;
+  margin: 0;
+  padding: 10px;
 }
 
 .top-gap {

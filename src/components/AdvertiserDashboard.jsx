@@ -5,6 +5,30 @@ import {
   getMyListings,
 } from "../services/listingService.js";
 
+function getListingStatusInfo(status) {
+  if (status === "approved") {
+    return {
+      label: "Approved",
+      image: "✅",
+      message: "Your listing is live on NamRent.",
+    };
+  }
+
+  if (status === "rejected") {
+    return {
+      label: "Rejected",
+      image: "❌",
+      message: "Your listing was rejected. Please check the admin note.",
+    };
+  }
+
+  return {
+    label: "Pending Review",
+    image: "⏳",
+    message: "Your listing is waiting for NamRent review.",
+  };
+}
+
 function AdvertiserDashboard({ currentUser }) {
   const [myListings, setMyListings] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -101,28 +125,54 @@ function AdvertiserDashboard({ currentUser }) {
               <p>You have not created any listings yet.</p>
             ) : (
               <div className="my-listings-list">
-                {myListings.map((listing) => (
-                  <article className="mini-listing-card" key={listing.id}>
-                    <div>
-                      <h3>{listing.title}</h3>
-                      <p>
-                        {listing.area}, {listing.location}
-                      </p>
-                      <strong>N${Number(listing.price).toLocaleString()}</strong>
-                    </div>
+                {myListings.map((listing) => {
+                  const statusInfo = getListingStatusInfo(listing.status);
 
-                    <span className={`status-pill ${listing.status}`}>
-                      {listing.status?.replaceAll("_", " ")}
-                    </span>
+                  return (
+                    <article className="mini-listing-card" key={listing.id}>
+                      <div className="mini-listing-top">
+                        <div className="status-icon">{statusInfo.image}</div>
 
-                    <button
-                      className="text-danger-btn"
-                      onClick={() => handleDeleteListing(listing.id)}
-                    >
-                      Delete
-                    </button>
-                  </article>
-                ))}
+                        <div>
+                          <h3>{listing.title}</h3>
+                          <p>
+                            {listing.area}, {listing.location}
+                          </p>
+                          <strong>N${Number(listing.price).toLocaleString()}</strong>
+                        </div>
+                      </div>
+
+                      <span className={`status-pill ${listing.status}`}>
+                        {statusInfo.label}
+                      </span>
+
+                      <p className="small-note">{statusInfo.message}</p>
+
+                      {listing.editedAfterSubmission && (
+                        <p className="edit-warning">
+                          Edited after submission. Waiting for admin review again.
+                        </p>
+                      )}
+
+                      {listing.adminNote && (
+                        <p className="admin-feedback">
+                          <strong>Admin note:</strong> {listing.adminNote}
+                        </p>
+                      )}
+
+                      <button className="secondary-btn">
+                        Update listing
+                      </button>
+
+                      <button
+                        className="text-danger-btn"
+                        onClick={() => handleDeleteListing(listing.id)}
+                      >
+                        Delete
+                      </button>
+                    </article>
+                  );
+                })}
               </div>
             )}
           </div>

@@ -17,6 +17,7 @@ const initialForm = {
 
 function CreateListingForm({ currentUser, onListingCreated }) {
   const [formData, setFormData] = useState(initialForm);
+  const [imageFiles, setImageFiles] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -66,13 +67,14 @@ function CreateListingForm({ currentUser, onListingCreated }) {
     try {
       setIsSaving(true);
 
-      const savedListing = await createListing(formData, currentUser);
+      const savedListing = await createListing(formData, currentUser, imageFiles);
 
       setMessage(
-        "Listing submitted successfully. It is now pending review."
+        "Listing submitted successfully. It is now pending NamRent admin review."
       );
 
       setFormData(initialForm);
+      setImageFiles([]);
 
       if (onListingCreated) {
         onListingCreated(savedListing);
@@ -225,6 +227,20 @@ function CreateListingForm({ currentUser, onListingCreated }) {
           placeholder="Describe the property, nearby places, rules, deposit, water/electricity, parking, and who it is suitable for."
           rows="5"
         />
+      </label>
+
+      <label className="full-width-field">
+        Property photos
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={(event) => setImageFiles(event.target.files)}
+        />
+        <small>
+          Upload clear photos of the rooms, outside area, bathroom, kitchen, and
+          entrance if possible.
+        </small>
       </label>
 
       <button className="primary-btn" type="submit" disabled={isSaving}>
