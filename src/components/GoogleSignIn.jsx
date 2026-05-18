@@ -1,23 +1,58 @@
 import { useState } from "react";
 import { signInWithPopup } from "firebase/auth";
-import { auth, googleProvider } from "../firebase.js";
+import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import { auth, db, googleProvider } from "../firebase.js";
+import { USER_ROLES } from "../authRoles.js";
 
-function GoogleSignIn({ role, fallbackUser, onSuccess }) {
+function GoogleSignIn({ selectedRole = USER_ROLES.TENANT, onSuccess }) {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleGoogleSignIn = async () => {
     setError("");
     setIsLoading(true);
+
     try {
       const result = await signInWithPopup(auth, googleProvider);
-      const profile = result.user;
+      const firebaseUser = result.user;
+
+      const userRef = doc(db, "users", firebaseUser.uid);
+      const existingUser = await getDoc(userRef);
+
+      let userData;
+
+      if (existingUser.exists()) {
+        userData = existingUser.data();
+
+        await setDoc(
+          userRef,
+          {
+            lastLoginAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+      } else {
+        userData = {
+          uid: firebaseUser.uid,
+          name: firebaseUser.displayName || "NamRent User",
+          email: firebaseUser.email,
+          photoURL: firebaseUser.photoURL || "",
+          role: selectedRole,
+          createdAt: serverTimestamp(),
+          lastLoginAt: serverTimestamp(),
+          status: "active",
+        };
+
+        await setDoc(userRef, userData);
+      }
+
       onSuccess({
-        role,
-        name: profile.displayName || fallbackUser.name,
-        email: profile.email || fallbackUser.email,
+        uid: firebaseUser.uid,
+        name: userData.name || firebaseUser.displayName,
+        email: userData.email || firebaseUser.email,
+        photoURL: userData.photoURL || firebaseUser.photoURL,
+        role: userData.role || USER_ROLES.TENANT,
         provider: "Google",
-        photoURL: profile.photoURL,
       });
     } catch (authError) {
       setError(authError.message || "Google sign-in could not be completed.");
@@ -32,6 +67,7 @@ function GoogleSignIn({ role, fallbackUser, onSuccess }) {
         <span aria-hidden="true">G</span>
         {isLoading ? "Connecting..." : "Continue with Google"}
       </button>
+
       {error && <p className="social-login-error">{error}</p>}
     </div>
   );

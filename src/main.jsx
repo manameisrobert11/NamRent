@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import "./styles.css";
 import GoogleSignIn from "./components/GoogleSignIn.jsx";
 import WindhoekMap from "./components/WindhoekMap.jsx";
+import { USER_ROLES, getRoleLabel } from "./authRoles.js";
 import { listings, locations, futureLocations, propertyTypes, priceRanges } from "./namrentData.js";
 
 const currency = new Intl.NumberFormat("en-NA", {
@@ -86,12 +87,33 @@ function getPersonalizedFeaturedListings(allListings, profile, limit = 12) {
   return [...new Map([...ranked, ...featured].map((listing) => [listing.id, listing])).values()].slice(0, limit);
 }
 
+function isAdminUser(user) {
+  return user?.role === USER_ROLES.ADMIN || user?.role === "agent";
+}
+
+function isAdvertiserUser(user) {
+  return user?.role === USER_ROLES.ADVERTISER || user?.role === "landlord";
+}
+
+function userCanAccessPage(user, page) {
+  if (page === "dashboard") {
+    return user?.role === "advertiser" || user?.role === "admin";
+  }
+
+  if (page === "admin") {
+    return user?.role === "admin";
+  }
+
+  return true;
+}
+
 function App() {
   const [page, setPage] = useState("home");
   const [currentUser, setCurrentUser] = useState(null);
   const [platformListings, setPlatformListings] = useState(listings);
   const [pendingListings, setPendingListings] = useState([]);
   const [emailNotifications, setEmailNotifications] = useState([]);
+  const [viewingRequests, setViewingRequests] = useState([]);
   const [visitProfile, setVisitProfile] = useState(() => readVisitProfile(null));
   const [selectedListingId, setSelectedListingId] = useState(listings[0].id);
   const [filters, setFilters] = useState({
@@ -175,6 +197,34 @@ function App() {
     ]);
   };
 
+  const submitViewingRequest = (listing, requestData) => {
+    const request = {
+      ...requestData,
+      id: `viewing-${Date.now()}`,
+      listingId: listing.id,
+      listingTitle: listing.title,
+      listingLocation: listing.location,
+      listingPrice: listing.price,
+      advertiserName: listing.contact.name,
+      advertiserEmail: listing.contact.email,
+      status: "pending",
+      responseMessage: "",
+      createdAt: new Date().toISOString(),
+    };
+    setViewingRequests((current) => [request, ...current]);
+    return request;
+  };
+
+  const respondToViewingRequest = (id, status, responseMessage = "") => {
+    setViewingRequests((current) =>
+      current.map((request) =>
+        request.id === id
+          ? { ...request, status, responseMessage, respondedAt: new Date().toISOString() }
+          : request,
+      ),
+    );
+  };
+
   const goToListing = (id) => {
     const viewedListing = platformListings.find((listing) => listing.id === id);
     if (viewedListing) {
@@ -248,7 +298,14 @@ function App() {
             shortStayMode
           />
         )}
-        {page === "details" && <PropertyDetails listing={selectedListing} setPage={setPage} />}
+        {page === "details" && (
+          <PropertyDetails
+            currentUser={currentUser}
+            listing={selectedListing}
+            onViewingRequest={submitViewingRequest}
+            setPage={setPage}
+          />
+        )}
         {page === "locations" && (
           <LocationsPage
             listingsData={platformListings}
@@ -261,22 +318,34 @@ function App() {
         {page === "contact" && <ContactPage />}
         {page === "login" && <LoginPage setUser={setCurrentUser} setPage={setPage} />}
         {page === "dashboard" && (
-          <UserDashboard
-            currentUser={currentUser}
-            emailNotifications={emailNotifications}
-            goToListing={goToListing}
-            listingsData={platformListings}
-            pendingListings={pendingListings}
-            submitListingForApproval={submitListingForApproval}
-          />
+          userCanAccessPage(currentUser, "dashboard") ? (
+            <UserDashboard
+              currentUser={currentUser}
+              emailNotifications={emailNotifications}
+              goToListing={goToListing}
+              listingsData={platformListings}
+              pendingListings={pendingListings}
+              submitListingForApproval={submitListingForApproval}
+              viewingRequests={viewingRequests}
+              respondToViewingRequest={respondToViewingRequest}
+            />
+          ) : (
+            <AccessDenied setPage={setPage} />
+          )
         )}
         {page === "admin" && (
-          <AdminDashboard
-            approveListing={approveListing}
-            emailNotifications={emailNotifications}
-            listingsData={platformListings}
-            pendingListings={pendingListings}
-          />
+          userCanAccessPage(currentUser, "admin") ? (
+            <AdminDashboard
+              approveListing={approveListing}
+              emailNotifications={emailNotifications}
+              listingsData={platformListings}
+              pendingListings={pendingListings}
+              viewingRequests={viewingRequests}
+              respondToViewingRequest={respondToViewingRequest}
+            />
+          ) : (
+            <AccessDenied setPage={setPage} />
+          )
         )}
         {page === "safety" && <SafetyPage />}
         {page === "terms" && <PolicyPage type="terms" />}
@@ -321,11 +390,11 @@ function Header({ page, setPage, currentUser, setCurrentUser }) {
       <div className="nav-actions">
         {currentUser ? (
           <>
-            {currentUser.role === "landlord" && (
+            {isAdvertiserUser(currentUser) && (
               <button className="nav-list-button" onClick={() => setPage("dashboard")}>Add listing</button>
             )}
-            <button className="account-button" onClick={() => setPage(currentUser.role === "agent" ? "admin" : "dashboard")}>
-              {currentUser.role === "agent" ? "Agent" : "Dashboard"}
+            <button className="account-button" onClick={() => setPage(isAdminUser(currentUser) ? "admin" : "dashboard")}>
+              {isAdminUser(currentUser) ? "Admin" : "Dashboard"}
             </button>
             <button className="account-button subtle" onClick={() => { setCurrentUser(null); setPage("home"); }}>Sign out</button>
           </>
@@ -339,7 +408,7 @@ function Header({ page, setPage, currentUser, setCurrentUser }) {
           ["home", "Home"],
           ["student", "Student"],
           ["airbnb", "Stays"],
-          [currentUser?.role === "landlord" ? "dashboard" : "advertise", currentUser?.role === "landlord" ? "Add" : "Ads"],
+          [isAdvertiserUser(currentUser) ? "dashboard" : "advertise", isAdvertiserUser(currentUser) ? "Add" : "Ads"],
         ].map(([key, label]) => (
           <button className={label === "logo" ? `mobile-logo-tab ${page === key ? "active" : ""}` : page === key ? "active" : ""} key={key} onClick={() => setPage(key)}>
             {label === "logo" ? <img src="/namrent-logo.png" alt="Rentals" /> : label}
@@ -371,8 +440,8 @@ function Home({ currentUser, emailNotifications, listingsData, pendingListings, 
           <SearchPanel filters={filters} setFilters={setFilters} onSearch={() => setPage("rentals")} />
           <div className="hero-actions">
             <button className="primary-button" onClick={() => setPage("rentals")}>Search Rentals</button>
-            <button className="secondary-button" onClick={() => setPage(currentUser?.role === "landlord" ? "dashboard" : "advertise")}>
-              {currentUser?.role === "landlord" ? "Add Your Listing" : "Advertise With Us"}
+            <button className="secondary-button" onClick={() => setPage(isAdvertiserUser(currentUser) ? "dashboard" : "advertise")}>
+              {isAdvertiserUser(currentUser) ? "Add Your Listing" : "Advertise With Us"}
             </button>
           </div>
         </div>
@@ -437,11 +506,11 @@ function HomeDashboard({ currentUser, emailNotifications, featuredCount, pending
   const ownPending = pendingListings.filter((listing) => listing.ownerEmail === currentUser.email);
   const ownEmails = emailNotifications.filter((email) => email.to === currentUser.email);
   const topVisitedLocation = Object.entries(visitProfile.locations ?? {}).sort(([, a], [, b]) => b - a)[0]?.[0] ?? "Start browsing";
-  const roleLabel = currentUser.role === "agent" ? "Realtor Agent" : currentUser.role === "landlord" ? "Landlord" : "Renter";
+  const roleLabel = currentUser.role === "agent" || currentUser.role === "landlord" ? (isAdminUser(currentUser) ? "NamRent Admin" : "Advertiser") : getRoleLabel(currentUser.role);
   const action =
-    currentUser.role === "landlord"
+    isAdvertiserUser(currentUser)
       ? { label: "Add a Listing", page: "dashboard" }
-      : currentUser.role === "agent"
+      : isAdminUser(currentUser)
         ? { label: "Review Listings", page: "admin" }
         : { label: "Browse Rentals", page: "rentals" };
 
@@ -460,8 +529,8 @@ function HomeDashboard({ currentUser, emailNotifications, featuredCount, pending
           <span>Account type</span>
         </article>
         <article>
-          <strong>{currentUser.role === "landlord" ? ownPending.length : featuredCount}</strong>
-          <span>{currentUser.role === "landlord" ? "Pending listings" : "Featured rentals"}</span>
+          <strong>{isAdvertiserUser(currentUser) ? ownPending.length : featuredCount}</strong>
+          <span>{isAdvertiserUser(currentUser) ? "Pending listings" : "Featured rentals"}</span>
         </article>
         <article>
           <strong>{ownEmails.length}</strong>
@@ -756,13 +825,29 @@ function ListingCard({ listing, goToListing }) {
         <div className="badge-row">
           {listing.badges.slice(0, 3).map((badge) => <span key={badge}>{badge}</span>)}
         </div>
-        <button className="primary-button full" onClick={() => goToListing(listing.id)}>View Details</button>
+        <button
+          className="primary-button full"
+          onClick={(event) => {
+            event.stopPropagation();
+            goToListing(listing.id);
+          }}
+        >
+          View Details
+        </button>
       </div>
     </article>
   );
 }
 
-function PropertyDetails({ listing, setPage }) {
+function PropertyDetails({ currentUser, listing, onViewingRequest, setPage }) {
+  const [requestOpen, setRequestOpen] = useState(false);
+  const [requestSent, setRequestSent] = useState(false);
+  const handleViewingRequest = (requestData) => {
+    onViewingRequest(listing, requestData);
+    setRequestSent(true);
+    setRequestOpen(false);
+  };
+
   return (
     <section className="details-page">
       <div className="details-gallery">
@@ -803,19 +888,81 @@ function PropertyDetails({ listing, setPage }) {
           <SafetyNotice compact text={listing.safety} />
         </article>
         <aside className="contact-card">
-          <h2>Contact Advertiser</h2>
-          <p>{listing.contact.name}</p>
-          {listing.contact.whatsapp && listing.contact.whatsapp !== "264000000000" ? (
-            <a className="primary-button full" href={`https://wa.me/${listing.contact.whatsapp}`} target="_blank" rel="noreferrer">WhatsApp</a>
-          ) : (
-            <button className="ghost-button full">Verify on Facebook</button>
+          <h2>Request a Viewing</h2>
+          <p>Send an organized viewing request to {listing.contact.name}. The advertiser can confirm, decline, or suggest another time.</p>
+          <button className="primary-button full" onClick={() => { setRequestOpen((current) => !current); setRequestSent(false); }}>
+            Request Viewing
+          </button>
+          {requestSent && <p className="request-success">Viewing request sent. The advertiser can now respond from their dashboard.</p>}
+          {requestOpen && (
+            <ViewingRequestForm
+              currentUser={currentUser}
+              listing={listing}
+              onSubmit={handleViewingRequest}
+            />
           )}
-          {listing.contact.phone.startsWith("+") && <a className="secondary-button full" href={`tel:${listing.contact.phone}`}>Call</a>}
-          <a className="secondary-button full" href={`mailto:${listing.contact.email}`}>Email</a>
+          <div className="direct-contact">
+            <strong>Direct contact</strong>
+            <p>{listing.contact.name}</p>
+          {listing.contact.phone.startsWith("+") ? (
+            <a className="secondary-button full" href={`tel:${listing.contact.phone}`}>Call Advertiser</a>
+          ) : (
+            <button className="ghost-button full" disabled>Call Advertiser Unavailable</button>
+          )}
+          </div>
           <button className="ghost-button full" onClick={() => setPage("safety")}>Rental Safety Tips</button>
         </aside>
       </div>
     </section>
+  );
+}
+
+function ViewingRequestForm({ currentUser, listing, onSubmit }) {
+  const submitForm = (event) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    onSubmit({
+      requesterName: data.get("requesterName"),
+      requesterPhone: data.get("requesterPhone"),
+      preferredDate: data.get("preferredDate"),
+      preferredTime: data.get("preferredTime"),
+      message: data.get("message"),
+      requesterEmail: currentUser?.email ?? "",
+    });
+    event.currentTarget.reset();
+  };
+
+  return (
+    <form className="viewing-form" onSubmit={submitForm}>
+      <label>
+        <span>Name</span>
+        <input name="requesterName" defaultValue={currentUser?.name ?? ""} placeholder="Your name" required />
+      </label>
+      <label>
+        <span>Phone / WhatsApp</span>
+        <input name="requesterPhone" type="tel" placeholder="+264 ..." required />
+      </label>
+      <div className="form-two">
+        <label>
+          <span>Preferred date</span>
+          <input name="preferredDate" type="date" required />
+        </label>
+        <label>
+          <span>Preferred time</span>
+          <input name="preferredTime" type="time" required />
+        </label>
+      </div>
+      <label>
+        <span>Short message</span>
+        <textarea
+          name="message"
+          rows="3"
+          defaultValue={`Hi, I would like to view ${listing.title}. Please confirm if this time works.`}
+          required
+        />
+      </label>
+      <button className="primary-button full" type="submit">Send Viewing Request</button>
+    </form>
   );
 }
 
@@ -978,7 +1125,16 @@ function RentalFlashcards({ eyebrow, title, text, flashListings, goToListing, cl
               <h3>{listing.title}</h3>
               <p className="room-residence">{listing.location}, {listing.city}</p>
               <p>{currency.format(listing.price).replace("NAD", "N$")} {listing.pricePeriod ?? "per month"}</p>
-              <button className="apply-button" onClick={() => goToListing(listing.id)}>View Details</button>
+              <button
+                className="apply-button"
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  goToListing(listing.id);
+                }}
+              >
+                View Details
+              </button>
             </article>
           ))}
         </div>
@@ -1098,7 +1254,7 @@ function PropertyForm({ currentUser, onSubmitListing }) {
     const propertyType = data.get("propertyType");
     const created = {
       title,
-      description: data.get("description") || `${propertyType} submitted by ${currentUser?.name ?? "a landlord"} for NamRent approval.`,
+      description: data.get("description") || `${propertyType} submitted by ${currentUser?.name ?? "an advertiser"} for NamRent approval.`,
       price: Number(data.get("price")),
       deposit: Number(data.get("deposit")),
       location,
@@ -1129,7 +1285,7 @@ function PropertyForm({ currentUser, onSubmitListing }) {
         .split(",")
         .map((item) => item.trim())
         .filter(Boolean),
-      safety: "This landlord-submitted listing is reviewed by NamRent before publication.",
+      safety: "This advertiser-submitted listing is reviewed by NamRent before publication.",
     };
     onSubmitListing(created);
     event.currentTarget.reset();
@@ -1210,45 +1366,58 @@ function ContactPage() {
 }
 
 function LoginPage({ setUser, setPage }) {
-  const demoUsers = [
-    { role: "renter", label: "Renter", name: "Lisan Renter", email: "renter@namrent.na" },
-    { role: "landlord", label: "Landlord", name: "Martha Landlord", email: "landlord@namrent.na" },
-    { role: "agent", label: "Realtor Agent", name: "Realtor Agent", email: "agent@namrent.na" },
+  const roleOptions = [
+    {
+      role: USER_ROLES.TENANT,
+      label: "I am looking for a rental",
+      name: "Tenant User",
+      email: "tenant@namrent.na",
+    },
+    {
+      role: USER_ROLES.ADVERTISER,
+      label: "I want to advertise a property",
+      name: "Advertiser User",
+      email: "advertiser@namrent.na",
+    },
   ];
   const [mode, setMode] = useState("signin");
-  const [role, setRole] = useState("renter");
-  const selectedDemo = demoUsers.find((user) => user.role === role);
+  const [selectedRole, setSelectedRole] = useState(USER_ROLES.TENANT);
+  const selectedDemo = roleOptions.find((user) => user.role === selectedRole);
+  const handleLoginSuccess = (user) => {
+    setUser(user);
+    if (user.role === USER_ROLES.ADMIN || user.role === "agent") {
+      setPage("admin");
+    } else if (user.role === USER_ROLES.ADVERTISER || user.role === "landlord") {
+      setPage("dashboard");
+    } else {
+      setPage("home");
+    }
+  };
   const handleAuth = (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const user = {
-      role,
+      role: selectedRole,
       name: data.get("name") || (mode === "signin" ? selectedDemo.name : "New NamRent User"),
       email: data.get("email") || selectedDemo.email,
     };
-    setUser(user);
-    setPage("home");
+    handleLoginSuccess(user);
   };
   const handleSocialAuth = (provider) => {
-    setUser({
-      role,
+    handleLoginSuccess({
+      role: selectedRole,
       name: `${selectedDemo.label} via ${provider}`,
       email: `${selectedDemo.role}.${provider.toLowerCase()}@namrent.na`,
       provider,
     });
-    setPage("home");
-  };
-  const handleAuthSuccess = (user) => {
-    setUser(user);
-    setPage("home");
   };
 
   return (
     <section className="section form-page auth-page">
       <div className="auth-header">
-        <p className="eyebrow">Accounts</p>
-        <h1>Access your NamRent profile</h1>
-        <p>Sign in or create an account to browse, submit, or approve rentals.</p>
+        <p className="eyebrow">NamRent Account</p>
+        <h1>Sign in to NamRent</h1>
+        <p>Choose how you want to use NamRent. Tenants can search rentals, while advertisers can post and manage listings.</p>
       </div>
       <div className="auth-grid">
         <form className="auth-card" onSubmit={handleAuth}>
@@ -1257,15 +1426,15 @@ function LoginPage({ setUser, setPage }) {
             <button className={mode === "signup" ? "active" : ""} type="button" onClick={() => setMode("signup")}>Sign up</button>
           </div>
           <h2>{mode === "signin" ? "Welcome back" : "Create your account"}</h2>
-          <div className="role-picker">
-            {demoUsers.map((user) => (
-              <button className={role === user.role ? "selected" : ""} key={user.role} type="button" onClick={() => setRole(user.role)}>
+          <div className="role-selector">
+            {roleOptions.map((user) => (
+              <button className={selectedRole === user.role ? "active" : ""} key={user.role} type="button" onClick={() => setSelectedRole(user.role)}>
                 {user.label}
               </button>
             ))}
           </div>
           <div className="social-login-grid">
-            <GoogleSignIn role={role} fallbackUser={selectedDemo} onSuccess={handleAuthSuccess} />
+            <GoogleSignIn selectedRole={selectedRole} onSuccess={handleLoginSuccess} />
             <button className="social-login-button facebook" type="button" onClick={() => handleSocialAuth("Facebook")}>
               <span aria-hidden="true">f</span>
               Continue with Facebook
@@ -1278,43 +1447,63 @@ function LoginPage({ setUser, setPage }) {
           {mode === "signup" && (
             <label><span>Phone number</span><input name="phone" type="tel" placeholder="+264 ..." autoComplete="tel" /></label>
           )}
-          <button className="primary-button full">{mode === "signin" ? `Sign in as ${selectedDemo.label}` : `Sign up as ${selectedDemo.label}`}</button>
+          <button className="primary-button full">{mode === "signin" ? `Sign in as ${getRoleLabel(selectedRole)}` : `Sign up as ${getRoleLabel(selectedRole)}`}</button>
+          <p className="small-note">Admin accounts are assigned manually by NamRent.</p>
         </form>
         <article className="auth-side-card">
           <h2>{mode === "signin" ? "Need an account?" : "Already registered?"}</h2>
           <p>
             {mode === "signin"
-              ? "Use Sign up to create a renter, landlord, or realtor agent profile."
+              ? "Use Sign up to create a tenant or advertiser profile."
               : "Use Sign in if you already have a NamRent profile."}
           </p>
           <button className="secondary-button full" onClick={() => setMode(mode === "signin" ? "signup" : "signin")}>
             {mode === "signin" ? "Go to Sign up" : "Go to Sign in"}
           </button>
           <h2>Role access</h2>
-          <p><strong>Renter:</strong> browse rentals and saved options.</p>
-          <p><strong>Landlord:</strong> submit a rental for NamRent approval.</p>
-          <p><strong>Realtor Agent:</strong> review pending listings and trigger approval emails.</p>
+          <p><strong>Tenant:</strong> browse rentals, request viewings, and compare places.</p>
+          <p><strong>Advertiser:</strong> submit rentals, manage viewing requests, and track approvals.</p>
+          <p><strong>Admin:</strong> assigned manually by NamRent for approvals and moderation.</p>
         </article>
       </div>
     </section>
   );
 }
 
-function UserDashboard({ currentUser, emailNotifications, goToListing, listingsData, pendingListings, submitListingForApproval }) {
+function AccessDenied({ setPage }) {
+  return (
+    <main className="page-section access-denied-page">
+      <div className="auth-card">
+        <p className="eyebrow">Access restricted</p>
+        <h1>You do not have permission to view this page.</h1>
+        <p>
+          This section is only available to approved NamRent advertisers or
+          admins.
+        </p>
+        <button className="primary-btn" onClick={() => setPage("login")}>
+          Sign in with the correct account
+        </button>
+      </div>
+    </main>
+  );
+}
+
+function UserDashboard({ currentUser, emailNotifications, goToListing, listingsData, pendingListings, submitListingForApproval, viewingRequests, respondToViewingRequest }) {
   if (!currentUser) {
     return (
       <section className="section">
-        <SectionHeading eyebrow="Dashboard" title="Please sign in" text="Sign in as a renter, landlord, or realtor agent to continue." />
+        <SectionHeading eyebrow="Dashboard" title="Please sign in" text="Sign in as a tenant, advertiser, or NamRent admin to continue." />
       </section>
     );
   }
   const ownPending = pendingListings.filter((listing) => listing.ownerEmail === currentUser.email);
   const ownEmails = emailNotifications.filter((email) => email.to === currentUser.email);
+  const ownViewingRequests = viewingRequests.filter((request) => request.advertiserEmail === currentUser.email);
 
-  if (currentUser.role === "landlord") {
+  if (isAdvertiserUser(currentUser)) {
     return (
       <section className="section dashboard-page">
-        <SectionHeading eyebrow="Landlord Dashboard" title="Submit a Place for Listing" text="Your property will stay pending until NamRent approves it. Once approved, an email notification is generated for you." />
+        <SectionHeading eyebrow="Advertiser Dashboard" title="Submit a Place for Listing" text="Your property will stay pending until NamRent approves it. Once approved, an email notification is generated for you." />
         {ownEmails.length > 0 && (
           <div className="email-panel">
             <h2>Approval Emails</h2>
@@ -1327,6 +1516,12 @@ function UserDashboard({ currentUser, emailNotifications, goToListing, listingsD
           </div>
         )}
         <PropertyForm currentUser={currentUser} onSubmitListing={submitListingForApproval} />
+        <ViewingRequestsPanel
+          emptyText="Viewing requests for your listings will appear here."
+          onRespond={respondToViewingRequest}
+          requests={ownViewingRequests}
+          title="Viewing Requests"
+        />
         <div className="admin-table">
           <div className="table-row head"><span>Your Submission</span><span>Status</span><span>Submitted</span></div>
           {ownPending.map((listing) => (
@@ -1350,14 +1545,68 @@ function UserDashboard({ currentUser, emailNotifications, goToListing, listingsD
   );
 }
 
-function AdminDashboard({ approveListing, emailNotifications, listingsData, pendingListings }) {
+function ViewingRequestsPanel({ emptyText, onRespond, requests, title }) {
+  const [drafts, setDrafts] = useState({});
+  const updateDraft = (id, value) => setDrafts((current) => ({ ...current, [id]: value }));
+  const respond = (id, status, fallbackMessage) => {
+    onRespond(id, status, drafts[id]?.trim() || fallbackMessage);
+    updateDraft(id, "");
+  };
+
+  return (
+    <section className="viewing-panel">
+      <div className="panel-heading">
+        <h2>{title}</h2>
+        <span>{requests.length} request{requests.length === 1 ? "" : "s"}</span>
+      </div>
+      {requests.length ? (
+        <div className="viewing-request-list">
+          {requests.map((request) => (
+            <article className="viewing-request-card" key={request.id}>
+              <div>
+                <strong>{request.listingTitle}</strong>
+                <p>{request.listingLocation} • {currency.format(request.listingPrice).replace("NAD", "N$")}</p>
+              </div>
+              <span className={`request-status ${request.status}`}>{request.status}</span>
+              <dl>
+                <div><dt>Viewer</dt><dd>{request.requesterName}</dd></div>
+                <div><dt>Phone / WhatsApp</dt><dd>{request.requesterPhone}</dd></div>
+                <div><dt>Preferred date</dt><dd>{request.preferredDate}</dd></div>
+                <div><dt>Preferred time</dt><dd>{request.preferredTime}</dd></div>
+              </dl>
+              <p className="request-message">{request.message}</p>
+              {request.responseMessage && <p className="request-response"><strong>Response:</strong> {request.responseMessage}</p>}
+              <label>
+                <span>Response note or suggested time</span>
+                <input
+                  value={drafts[request.id] ?? ""}
+                  onChange={(event) => updateDraft(request.id, event.target.value)}
+                  placeholder="Example: Confirmed for 15:00, or suggest tomorrow at 10:00"
+                />
+              </label>
+              <div className="request-actions">
+                <button type="button" onClick={() => respond(request.id, "confirmed", "Viewing confirmed. Please arrive on time and bring your ID.")}>Confirm</button>
+                <button type="button" onClick={() => respond(request.id, "declined", "Viewing declined. The advertiser is not available at the requested time.")}>Decline</button>
+                <button type="button" onClick={() => respond(request.id, "suggested", "Please suggest another viewing time.")}>Suggest time</button>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <p className="empty-state">{emptyText}</p>
+      )}
+    </section>
+  );
+}
+
+function AdminDashboard({ approveListing, emailNotifications, listingsData, pendingListings, viewingRequests, respondToViewingRequest }) {
   const stats = [
     ["Total listings", listingsData.length],
     ["Awaiting approval", pendingListings.length],
     ["Active rentals", listingsData.length],
     ["Student listings", listingsData.filter((listing) => listing.category === "Student rentals").length],
     ["Short stays", listingsData.filter((listing) => listing.category === "Short stays").length],
-    ["Advertisements", 2],
+    ["Viewing requests", viewingRequests.length],
   ];
 
   return (
@@ -1377,6 +1626,12 @@ function AdminDashboard({ approveListing, emailNotifications, listingsData, pend
         ))}
         {!pendingListings.length && <div className="table-row"><span>No pending listings.</span><span>-</span><span>-</span></div>}
       </div>
+      <ViewingRequestsPanel
+        emptyText="No viewing requests have been submitted yet."
+        onRespond={respondToViewingRequest}
+        requests={viewingRequests}
+        title="All Viewing Requests"
+      />
       <div className="email-panel">
         <h2>Approval Email Log</h2>
         {emailNotifications.map((email) => (
@@ -1435,14 +1690,14 @@ function Chatbot({ listingsData, setPage, setFilters }) {
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState([
-    { from: "bot", text: "Hi, I am the NamRent assistant. Ask me for rentals by area, budget, type, student housing, short stays, safety, or landlord listing steps." },
+    { from: "bot", text: "Hi, I am the NamRent assistant. Ask me for rentals by area, budget, type, student housing, short stays, safety, or advertiser listing steps." },
   ]);
 
   const quickActions = [
     "Student rooms under N$4,000",
     "Compare Capital Residence and Winco",
     "Short stays in Eros",
-    "How do landlords add listings?",
+    "How do advertisers add listings?",
   ];
 
   const findLocation = (lower) => {
@@ -1576,13 +1831,13 @@ function Chatbot({ listingsData, setPage, setFilters }) {
       return `Here is a quick comparison:\n${mentionedListings.slice(0, 3).map((listing) => `- ${formatListingLine(listing)}; ${listing.propertyType}; ${listing.bedrooms} bed option`).join("\n")}\nOpen Student Rentals to inspect the room options and confirm current availability.`;
     }
 
-    if (lower.includes("landlord") || lower.includes("list my") || lower.includes("submit") || lower.includes("add listing")) {
+    if (lower.includes("advertiser") || lower.includes("landlord") || lower.includes("list my") || lower.includes("submit") || lower.includes("add listing")) {
       setPage("dashboard");
-      return "For landlords: sign in or sign up as a Landlord, use Add listing, complete the property details, then NamRent/Realtor Agent reviews it. Once approved, the listing goes live and an approval email is generated.";
+      return "For advertisers: sign in or sign up as an Advertiser, use Add listing, complete the property details, then NamRent reviews it. Once approved, the listing goes live and an approval email is generated.";
     }
 
     if (lower.includes("approve") || lower.includes("approval")) {
-      return "Listings submitted by landlords stay pending first. A Realtor Agent reviews them, approves valid listings, and NamRent generates an approval email for the landlord.";
+      return "Listings submitted by advertisers stay pending first. NamRent reviews them, approves valid listings, and generates an approval email for the advertiser.";
     }
 
     if (lower.includes("whatsapp") || lower.includes("contact") || lower.includes("call") || lower.includes("email")) {
@@ -1632,7 +1887,7 @@ function Chatbot({ listingsData, setPage, setFilters }) {
       return "I applied those filters, but there are no exact matches yet. Try widening the area, increasing the budget, or removing one requirement like parking or furnished status.";
     }
 
-    return "I can handle detailed rental questions. Try: student room under N$4,000 in Windhoek Central, bachelor flat in Khomasdal with parking, compare Capital Residence and Winco, or how do landlords add listings?";
+    return "I can handle detailed rental questions. Try: student room under N$4,000 in Windhoek Central, bachelor flat in Khomasdal with parking, compare Capital Residence and Winco, or how do advertisers add listings?";
   };
 
   const sendAssistantReply = (userText) => {
