@@ -39,8 +39,11 @@ export async function createListing(listingData, currentUser) {
     ownerName: currentUser.name || currentUser.displayName || "NamRent Advertiser",
     ownerEmail: currentUser.email || "",
 
-    status: "pending",
+    status: "pending_review",
+    verificationStatus: "not_verified",
+    adminNote: "",
     featured: false,
+
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
@@ -78,4 +81,19 @@ export async function deleteListing(listingId) {
   }
 
   await deleteDoc(doc(db, LISTINGS_COLLECTION, listingId));
+}
+
+export async function getApprovedListings() {
+  const listingsQuery = query(
+    collection(db, LISTINGS_COLLECTION),
+    where("status", "==", "approved"),
+    orderBy("createdAt", "desc")
+  );
+
+  const snapshot = await getDocs(listingsQuery);
+
+  return snapshot.docs.map((listingDoc) => ({
+    id: listingDoc.id,
+    ...listingDoc.data(),
+  }));
 }

@@ -112,7 +112,7 @@ function AdvertiserDashboard({ currentUser }) {
                     </div>
 
                     <span className={`status-pill ${listing.status}`}>
-                      {listing.status}
+                      {listing.status?.replaceAll("_", " ")}
                     </span>
 
                     <button

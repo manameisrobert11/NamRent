@@ -69,7 +69,7 @@ function CreateListingForm({ currentUser, onListingCreated }) {
       const savedListing = await createListing(formData, currentUser);
 
       setMessage(
-        "Listing submitted successfully. It is now pending admin approval."
+        "Listing submitted successfully. It is now pending review."
       );
 
       setFormData(initialForm);

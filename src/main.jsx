@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import "./styles.css";
 import GoogleSignIn from "./components/GoogleSignIn.jsx";
 import AdvertiserDashboard from "./components/AdvertiserDashboard.jsx";
+import AdminListingReview from "./components/AdminListingReview.jsx";
 import WindhoekMap from "./components/WindhoekMap.jsx";
 import { USER_ROLES, getRoleLabel } from "./authRoles.js";
 import { listings, locations, futureLocations, propertyTypes, priceRanges } from "./namrentData.js";
@@ -327,14 +328,7 @@ function App() {
         )}
         {page === "admin" && (
           userCanAccessPage(currentUser, "admin") ? (
-            <AdminDashboard
-              approveListing={approveListing}
-              emailNotifications={emailNotifications}
-              listingsData={platformListings}
-              pendingListings={pendingListings}
-              viewingRequests={viewingRequests}
-              respondToViewingRequest={respondToViewingRequest}
-            />
+            <AdminListingReview currentUser={currentUser} />
           ) : (
             <AccessDenied setPage={setPage} />
           )
