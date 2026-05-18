@@ -958,7 +958,7 @@ function PropertyDetails({ currentUser, listing, onViewingRequest, setPage }) {
   return (
     <section className="details-page">
       <div className="details-gallery">
-        <ListingPhotoGallery photos={detailPhotos} title={listing.title} />
+        <ListingPhotoGallery photos={detailPhotos} title={listing.title} variant="property" />
       </div>
       <div className="details-layout">
         <article className="details-main">
