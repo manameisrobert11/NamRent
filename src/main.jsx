@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 import GoogleSignIn from "./components/GoogleSignIn.jsx";
+import AdvertiserDashboard from "./components/AdvertiserDashboard.jsx";
 import WindhoekMap from "./components/WindhoekMap.jsx";
 import { USER_ROLES, getRoleLabel } from "./authRoles.js";
 import { listings, locations, futureLocations, propertyTypes, priceRanges } from "./namrentData.js";
@@ -319,16 +320,7 @@ function App() {
         {page === "login" && <LoginPage setUser={setCurrentUser} setPage={setPage} />}
         {page === "dashboard" && (
           userCanAccessPage(currentUser, "dashboard") ? (
-            <UserDashboard
-              currentUser={currentUser}
-              emailNotifications={emailNotifications}
-              goToListing={goToListing}
-              listingsData={platformListings}
-              pendingListings={pendingListings}
-              submitListingForApproval={submitListingForApproval}
-              viewingRequests={viewingRequests}
-              respondToViewingRequest={respondToViewingRequest}
-            />
+            <AdvertiserDashboard currentUser={currentUser} />
           ) : (
             <AccessDenied setPage={setPage} />
           )
