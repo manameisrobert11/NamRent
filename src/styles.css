@@ -1718,6 +1718,109 @@ textarea {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.advertising-hero {
+  background:
+    linear-gradient(135deg, rgba(6, 38, 82, 0.92), rgba(13, 79, 158, 0.82)),
+    url("/Christ_Church_in_Windhoek,_Namibia.jpg") center/cover;
+  color: var(--white);
+  padding: clamp(56px, 8vw, 98px) clamp(18px, 4vw, 56px);
+}
+
+.advertising-hero > div {
+  max-width: 820px;
+}
+
+.advertising-hero h1 {
+  font-size: clamp(2.3rem, 5vw, 4.2rem);
+  line-height: 1.02;
+  margin: 8px 0 16px;
+}
+
+.advertising-hero p:not(.eyebrow) {
+  font-size: 1.08rem;
+  line-height: 1.72;
+  margin: 0 0 24px;
+  max-width: 720px;
+  opacity: 0.92;
+}
+
+.advertise-section .section-heading {
+  max-width: 860px;
+}
+
+.advertise-benefits,
+.advertiser-type-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.advertise-benefits {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.advertise-benefits article,
+.advertiser-type-grid article {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 14px 30px rgba(8, 47, 97, 0.06);
+  padding: 18px;
+}
+
+.advertise-benefits h2 {
+  color: var(--blue-900);
+  margin: 0 0 8px;
+}
+
+.advertise-benefits p {
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.advertiser-type-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.advertiser-type-grid article {
+  color: var(--blue-900);
+  font-weight: 900;
+}
+
+.advertising-package-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.advertising-package-grid article {
+  display: grid;
+  gap: 12px;
+}
+
+.advertising-package-grid article.selected {
+  border-color: var(--blue-700);
+  box-shadow: 0 18px 38px rgba(13, 79, 158, 0.15);
+}
+
+.advertising-package-grid article.selected::before {
+  background: var(--blue-700);
+  border-radius: 999px;
+  color: var(--white);
+  content: "Selected";
+  font-size: 0.75rem;
+  font-weight: 900;
+  justify-self: start;
+  padding: 5px 9px;
+}
+
+.advertising-request-form {
+  max-width: 1040px;
+}
+
+.advertising-steps article {
+  display: grid;
+  gap: 10px;
+}
+
 .auth-header {
   margin: 0 auto 24px;
   max-width: 760px;
@@ -2673,6 +2776,172 @@ textarea {
   gap: 18px;
 }
 
+.admin-approved-groups {
+  display: grid;
+  gap: 28px;
+}
+
+.admin-approved-group {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-group-heading {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.admin-group-heading h2 {
+  color: var(--blue-900);
+  margin: 0;
+}
+
+.admin-group-heading span {
+  background: var(--blue-100);
+  border-radius: 999px;
+  color: var(--blue-800);
+  font-size: 0.82rem;
+  font-weight: 900;
+  padding: 6px 10px;
+}
+
+.admin-create-panel {
+  align-items: center;
+  background: var(--white);
+  border: 1px solid #dce9f7;
+  border-radius: 8px;
+  box-shadow: 0 18px 44px rgba(6, 38, 82, 0.06);
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  padding: 18px;
+}
+
+.admin-create-panel h2 {
+  color: var(--blue-900);
+  margin: 0 0 6px;
+}
+
+.admin-create-panel p:not(.eyebrow) {
+  color: var(--muted);
+  margin: 0;
+}
+
+.admin-create-form-wrap {
+  margin-bottom: 22px;
+}
+
+.admin-create-form {
+  border-color: #cfe0f4;
+}
+
+.admin-advertising-panel {
+  background: var(--white);
+  border: 1px solid #dce9f7;
+  border-radius: 8px;
+  box-shadow: 0 18px 44px rgba(6, 38, 82, 0.06);
+  display: grid;
+  gap: 18px;
+  margin-bottom: 18px;
+  padding: 18px;
+}
+
+.advertising-admin-layout {
+  align-items: start;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
+}
+
+.advertising-request-list {
+  display: grid;
+  gap: 12px;
+}
+
+.advertising-request-card,
+.advert-board-form {
+  background: #fbfdff;
+  border: 1px solid #dce9f7;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.advertising-request-card {
+  display: grid;
+  gap: 12px;
+}
+
+.advertising-request-card h3 {
+  color: var(--blue-900);
+  margin: 8px 0 6px;
+}
+
+.advertising-request-card p {
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 4px 0;
+}
+
+.advertising-request-card .request-actions {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.request-status.new {
+  background: #fff7e8;
+  color: #9a5300;
+}
+
+.request-status.contacted {
+  background: var(--blue-100);
+  color: var(--blue-800);
+}
+
+.request-status.approved,
+.request-status.completed {
+  background: #edfdf4;
+  color: #0f6b3a;
+}
+
+.request-status.rejected {
+  background: #fff1f1;
+  color: #aa2020;
+}
+
+.advert-board-form {
+  display: grid;
+  gap: 12px;
+}
+
+.advert-board-form h2 {
+  color: var(--blue-900);
+  margin: 0;
+}
+
+.advert-board-form p {
+  color: var(--muted);
+  margin: 0;
+}
+
+.advert-board-form label {
+  color: var(--blue-900);
+  font-weight: 800;
+}
+
+.advert-board-form input,
+.advert-board-form textarea {
+  background: var(--white);
+  border: 1px solid #d4dfed;
+  border-radius: 7px;
+  color: var(--ink);
+  font: inherit;
+  min-height: 46px;
+  padding: 10px 13px;
+  width: 100%;
+}
+
 .admin-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -2990,6 +3259,42 @@ textarea {
   margin-top: 16px;
 }
 
+.admin-edit-grid {
+  background: #fbfdff;
+  border: 1px solid #dce9f7;
+  border-radius: 8px;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 18px;
+  padding: 16px;
+}
+
+.admin-edit-grid label {
+  color: var(--blue-900);
+  display: flex;
+  flex-direction: column;
+  font-weight: 800;
+  gap: 8px;
+}
+
+.admin-edit-grid input,
+.admin-edit-grid select,
+.admin-edit-grid textarea {
+  background: var(--white);
+  border: 1px solid #d4dfed;
+  border-radius: 7px;
+  color: var(--ink);
+  font: inherit;
+  min-height: 48px;
+  padding: 12px 13px;
+  width: 100%;
+}
+
+.admin-edit-grid textarea {
+  resize: vertical;
+}
+
 .admin-category-grid label {
   color: var(--blue-900);
   display: flex;
@@ -3248,6 +3553,9 @@ textarea {
   .listing-grid,
   .steps-grid,
   .package-grid,
+  .advertise-benefits,
+  .advertiser-type-grid,
+  .advertising-package-grid,
   .admin-page .stat-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -3340,7 +3648,21 @@ textarea {
     width: 100%;
   }
 
+  .admin-create-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .advertising-admin-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .advertising-request-card .request-actions {
+    grid-template-columns: 1fr;
+  }
+
   .admin-category-grid,
+  .admin-edit-grid,
   .advertiser-listing-card {
     grid-template-columns: 1fr;
   }
@@ -3451,6 +3773,9 @@ textarea {
   .listing-grid,
   .steps-grid,
   .package-grid,
+  .advertise-benefits,
+  .advertiser-type-grid,
+  .advertising-package-grid,
   .auth-grid,
   .admin-page .stat-grid,
   .wide-form,

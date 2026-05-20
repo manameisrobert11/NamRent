@@ -6,6 +6,10 @@ import AdvertiserDashboard from "./components/AdvertiserDashboard.jsx";
 import AdminListingReview from "./components/AdminListingReview.jsx";
 import WindhoekMap from "./components/WindhoekMap.jsx";
 import ListingPhotoGallery from "./components/ListingPhotoGallery.jsx";
+import {
+  createAdvertisingRequest,
+  listenToAdvertisementBoards,
+} from "./services/advertisingService.js";
 import { listenToApprovedListings } from "./services/listingService.js";
 import { USER_ROLES, getRoleLabel } from "./authRoles.js";
 import { listings, locations, futureLocations, propertyTypes, priceRanges } from "./namrentData.js";
@@ -503,7 +507,9 @@ function Header({ page, setPage, currentUser, setCurrentUser }) {
           ["home", "Home"],
           ["student", "Student"],
           ["airbnb", "Stays"],
-          [isAdvertiserUser(currentUser) ? "dashboard" : "advertise", isAdvertiserUser(currentUser) ? "Add" : "Ads"],
+          currentUser
+            ? [isAdvertiserUser(currentUser) ? "dashboard" : isAdminUser(currentUser) ? "admin" : "rentals", isAdvertiserUser(currentUser) ? "Add" : isAdminUser(currentUser) ? "Admin" : "Rent"]
+            : ["login", "Sign in"],
         ].map(([key, label]) => (
           <button className={label === "logo" ? `mobile-logo-tab ${page === key ? "active" : ""}` : page === key ? "active" : ""} key={key} onClick={() => setPage(key)}>
             {label === "logo" ? <img src="/namrent-logo.png" alt="Rentals" /> : label}
@@ -1074,7 +1080,8 @@ function SponsoredCarousel() {
   const [activeAd, setActiveAd] = useState(0);
   const [dragStart, setDragStart] = useState(null);
   const [dragOffset, setDragOffset] = useState(0);
-  const adverts = [
+  const [adminAdverts, setAdminAdverts] = useState([]);
+  const defaultAdverts = [
     {
       title: "Gencorp Investment CC",
       text: "Property development, investment opportunities, and real estate solutions.",
@@ -1085,6 +1092,13 @@ function SponsoredCarousel() {
       text: "Smart rail scanning, barcode tracking, and mobile-friendly inventory tools.",
       image: "/ads/pwa-railway.png",
     },
+  ];
+  const adverts = [
+    ...adminAdverts,
+    ...defaultAdverts.filter(
+      (defaultAdvert) =>
+        !adminAdverts.some((advert) => advert.title === defaultAdvert.title)
+    ),
   ];
   const showPrevious = () => setActiveAd((current) => (current === 0 ? adverts.length - 1 : current - 1));
   const showNext = () => setActiveAd((current) => (current + 1) % adverts.length);
@@ -1101,6 +1115,22 @@ function SponsoredCarousel() {
     const timer = window.setInterval(showNext, 5000);
     return () => window.clearInterval(timer);
   }, [adverts.length]);
+
+  useEffect(() => {
+    const unsubscribe = listenToAdvertisementBoards((boards) => {
+      setAdminAdverts(
+        boards.map((board) => ({
+          title: board.title,
+          text: board.text,
+          image: board.image,
+          linkUrl: board.linkUrl,
+        }))
+      );
+      setActiveAd(0);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   return (
     <section className="section sponsored-section" aria-label="Sponsored advertisements">
@@ -1431,26 +1461,282 @@ function PropertyForm({ currentUser, onSubmitListing }) {
 }
 
 function AdvertisePage() {
-  const packages = [
-    ["Basic Listing", "Normal search results placement with standard contact details."],
-    ["Featured Listing", "Higher visibility in results and homepage featured sections."],
-    ["Business Advertisement", "Banner or board placement for services like moving, furniture, internet, cleaning, or security."],
-    ["Student Accommodation Promotion", "Featured placement inside the student rentals section."],
+  const packageOptions = [
+    {
+      title: "Basic Listing",
+      text: "Add a rental listing with standard visibility and contact details.",
+    },
+    {
+      title: "Featured Listing",
+      text: "Boost one rental listing to the top of featured rental sections.",
+    },
+    {
+      title: "Business Advertisement",
+      text: "Promote moving, furniture, Wi-Fi, cleaning, security, or property services.",
+    },
+    {
+      title: "Student Accommodation Promotion",
+      text: "Promote student rooms, hostels, residences, or campus-focused accommodation.",
+    },
+    {
+      title: "Homepage Banner Advert",
+      text: "Advertise your business in the homepage sponsored carousel.",
+    },
+    {
+      title: "Area Sponsorship",
+      text: "Sponsor visibility around a selected location or suburb category.",
+    },
   ];
+  const audienceOptions = [
+    "Students",
+    "Families",
+    "Short-stay visitors",
+    "General renters",
+    "Landlords / property owners",
+  ];
+  const budgetOptions = [
+    "Below N$500",
+    "N$500 - N$1000",
+    "N$1000 - N$2500",
+    "N$2500+",
+    "Not sure yet",
+  ];
+  const advertiserTypes = [
+    "Landlords",
+    "Estate agents",
+    "Student accommodation providers",
+    "Property developers",
+    "Moving companies",
+    "Furniture businesses",
+    "Internet providers",
+    "Cleaning/security services",
+  ];
+  const processSteps = [
+    "Submit your advertising request.",
+    "NamRent checks that the advert is relevant and safe for renters.",
+    "We contact you to confirm placement, timing, and artwork.",
+    "Approved adverts are scheduled and published.",
+  ];
+  const [selectedPackage, setSelectedPackage] = useState(packageOptions[0].title);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [formError, setFormError] = useState("");
+
+  const choosePackage = (packageTitle) => {
+    setSelectedPackage(packageTitle);
+    window.setTimeout(() => {
+      document.getElementById("advertising-request-form")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 0);
+  };
+
+  const submitAdvertisingRequest = async (event) => {
+    event.preventDefault();
+    setSuccessMessage("");
+    setFormError("");
+
+    const data = new FormData(event.currentTarget);
+    const requestData = {
+      name: data.get("name") || "",
+      businessName: data.get("businessName") || "",
+      email: data.get("email") || "",
+      phone: data.get("phone") || "",
+      packageType: data.get("packageType") || selectedPackage,
+      targetAudience: data.get("targetAudience") || "",
+      budgetRange: data.get("budgetRange") || "",
+      message: data.get("message") || "",
+    };
+
+    if (
+      !requestData.name.trim() ||
+      !requestData.businessName.trim() ||
+      !requestData.email.trim() ||
+      !requestData.phone.trim() ||
+      !requestData.message.trim()
+    ) {
+      setFormError("Please complete all required fields before submitting.");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      await createAdvertisingRequest(requestData);
+      setSuccessMessage("Advertising request submitted. NamRent will review it and contact you.");
+      event.currentTarget.reset();
+      setSelectedPackage(packageOptions[0].title);
+    } catch (error) {
+      setFormError(error.message || "Failed to submit advertising request.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
-    <section className="section">
-      <SectionHeading eyebrow="Advertising" title="Advertise With NamRent" text="Reach people actively searching for rental accommodation in Windhoek." />
-      <div className="package-grid">
-        {packages.map(([title, text]) => (
-          <article key={title}>
-            <h2>{title}</h2>
-            <p>{text}</p>
-            <button className="secondary-button">Choose Package</button>
+    <>
+      <section className="advertising-hero">
+        <div>
+          <p className="eyebrow">Advertising</p>
+          <h1>Advertise With NamRent</h1>
+          <p>
+            Promote your rental, student accommodation, agency, or property-related
+            service to people actively searching for places to rent in Namibia.
+          </p>
+          <button className="primary-button" onClick={() => choosePackage(selectedPackage)}>
+            Request Advertising
+          </button>
+        </div>
+      </section>
+
+      <section className="section advertise-section">
+        <SectionHeading
+          eyebrow="Why advertise"
+          title="Reach renters when they are ready to act"
+          text="NamRent connects advertisers with students, families, short-stay visitors, and general renters already comparing places and services."
+        />
+        <div className="advertise-benefits">
+          <article>
+            <h2>Rental-focused audience</h2>
+            <p>Your advert appears around a property search experience, not a random feed.</p>
           </article>
-        ))}
-      </div>
-    </section>
+          <article>
+            <h2>Namibia-first visibility</h2>
+            <p>Start with Windhoek renters and expand as NamRent grows into more Namibian towns.</p>
+          </article>
+          <article>
+            <h2>Reviewed placements</h2>
+            <p>NamRent reviews advertising requests before publishing to keep adverts relevant and safe.</p>
+          </article>
+        </div>
+      </section>
+
+      <section className="section pale advertise-section">
+        <SectionHeading
+          eyebrow="Who can advertise?"
+          title="Property and rental-related businesses"
+          text="The platform can support more than rental listings, including services renters need before and after moving."
+        />
+        <div className="advertiser-type-grid">
+          {advertiserTypes.map((type) => (
+            <article key={type}>{type}</article>
+          ))}
+        </div>
+      </section>
+
+      <section className="section advertise-section">
+        <SectionHeading
+          eyebrow="Packages"
+          title="Choose an advertising package"
+          text="Select a package to pre-fill the request form. NamRent will confirm availability, pricing, and final placement before publishing."
+        />
+        <div className="package-grid advertising-package-grid">
+          {packageOptions.map((advertPackage) => (
+            <article
+              className={selectedPackage === advertPackage.title ? "selected" : ""}
+              key={advertPackage.title}
+            >
+              <h2>{advertPackage.title}</h2>
+              <p>{advertPackage.text}</p>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => choosePackage(advertPackage.title)}
+              >
+                Choose Package
+              </button>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="section pale advertise-section" id="advertising-request-form">
+        <SectionHeading
+          eyebrow="Request form"
+          title="Request advertising"
+          text="Tell us what you want to promote. Your request will be saved for NamRent review."
+        />
+        <form className="wide-form advertising-request-form" onSubmit={submitAdvertisingRequest}>
+          {successMessage && <p className="form-success full-field">{successMessage}</p>}
+          {formError && <p className="form-error full-field">{formError}</p>}
+
+          <label>
+            <span>Full name</span>
+            <input name="name" required />
+          </label>
+          <label>
+            <span>Business / agency / landlord name</span>
+            <input name="businessName" required />
+          </label>
+          <label>
+            <span>Email</span>
+            <input name="email" type="email" required />
+          </label>
+          <label>
+            <span>Phone / WhatsApp</span>
+            <input name="phone" type="tel" required />
+          </label>
+          <label>
+            <span>Advert package</span>
+            <select
+              name="packageType"
+              value={selectedPackage}
+              onChange={(event) => setSelectedPackage(event.target.value)}
+            >
+              {packageOptions.map((advertPackage) => (
+                <option key={advertPackage.title} value={advertPackage.title}>
+                  {advertPackage.title}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Target audience</span>
+            <select name="targetAudience" defaultValue={audienceOptions[0]}>
+              {audienceOptions.map((audience) => (
+                <option key={audience} value={audience}>{audience}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Budget range</span>
+            <select name="budgetRange" defaultValue={budgetOptions[0]}>
+              {budgetOptions.map((budget) => (
+                <option key={budget} value={budget}>{budget}</option>
+              ))}
+            </select>
+          </label>
+          <label className="full-field">
+            <span>Message</span>
+            <textarea
+              name="message"
+              rows="6"
+              placeholder="Example: I want to promote student rooms in Windhoek."
+              required
+            />
+          </label>
+          <button className="primary-button" type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Submitting request..." : "Submit Advertising Request"}
+          </button>
+        </form>
+      </section>
+
+      <section className="section advertise-section">
+        <SectionHeading
+          eyebrow="After submission"
+          title="What happens next?"
+          text="Advertising requests start as new enquiries. The admin team can later mark them as contacted, approved, rejected, or completed."
+        />
+        <div className="steps-grid advertising-steps">
+          {processSteps.map((step, index) => (
+            <article key={step}>
+              <span>{index + 1}</span>
+              <p>{step}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+    </>
   );
 }
 

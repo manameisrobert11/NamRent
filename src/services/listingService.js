@@ -71,6 +71,64 @@ export async function createListing(listingData, currentUser, imageFiles = []) {
   };
 }
 
+export async function createAdminListing(listingData, currentUser, imageFiles = []) {
+  if (!currentUser?.uid) {
+    throw new Error("You must be signed in as an admin to create a listing.");
+  }
+
+  const folder = `admin-listing-photos/${currentUser.uid}/${Date.now()}`;
+  const photoUrls = await uploadListingImages(imageFiles, folder);
+
+  const newListing = {
+    title: listingData.title.trim(),
+    location: listingData.location.trim(),
+    area: listingData.area.trim(),
+    price: Number(listingData.price),
+    deposit: Number(listingData.deposit || 0),
+    waterIncluded: listingData.waterIncluded,
+    electricityIncluded: listingData.electricityIncluded,
+    availableFrom: listingData.availableFrom,
+    bedrooms: Number(listingData.bedrooms),
+    bathrooms: Number(listingData.bathrooms),
+    type: listingData.type,
+    category: listingData.category,
+    description: listingData.description.trim(),
+    contactPhone: listingData.contactPhone.trim(),
+    contactWhatsApp: listingData.contactWhatsApp.trim(),
+
+    advertiserPhotos: photoUrls,
+    namrentVerificationPhotos: [],
+
+    ownerId: currentUser.uid,
+    ownerName: currentUser.name || currentUser.displayName || "NamRent Admin",
+    ownerEmail: currentUser.email || "",
+
+    status: "approved",
+    verificationStatus: "admin_added",
+
+    adminNote: listingData.adminNote?.trim() || "Created directly by NamRent admin.",
+    editedAfterSubmission: false,
+    needsAdminReview: false,
+
+    featured: true,
+    createdByAdmin: true,
+    approvedBy: currentUser.uid,
+    approvedByName: currentUser.name || currentUser.email || "NamRent Admin",
+
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    approvedAt: serverTimestamp(),
+    rejectedAt: null,
+  };
+
+  const docRef = await addDoc(collection(db, LISTINGS_COLLECTION), newListing);
+
+  return {
+    id: docRef.id,
+    ...newListing,
+  };
+}
+
 export async function updateAdvertiserListing(
   listingId,
   listingData,
@@ -141,6 +199,41 @@ export async function approveListing(listingId, currentUser, adminEdits = {}) {
     approvedAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
+}
+
+export async function updateListingClassification(listingId, currentUser, adminEdits = {}) {
+  await updateDoc(doc(db, LISTINGS_COLLECTION, listingId), {
+    type: adminEdits.type || "Apartment",
+    category: adminEdits.category || "Long-term rental",
+    categorizedBy: currentUser?.uid || "",
+    categorizedByName: currentUser?.name || currentUser?.email || "NamRent Admin",
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function updateAdminListingDetails(listingId, currentUser, adminEdits = {}) {
+  const updatedData = {
+    updatedByAdmin: true,
+    updatedByAdminId: currentUser?.uid || "",
+    updatedByAdminName: currentUser?.name || currentUser?.email || "NamRent Admin",
+    updatedAt: serverTimestamp(),
+  };
+
+  if (adminEdits.title !== undefined) updatedData.title = adminEdits.title.trim();
+  if (adminEdits.location !== undefined) updatedData.location = adminEdits.location.trim();
+  if (adminEdits.area !== undefined) updatedData.area = adminEdits.area.trim();
+  if (adminEdits.price !== undefined) updatedData.price = Number(adminEdits.price);
+  if (adminEdits.deposit !== undefined) updatedData.deposit = Number(adminEdits.deposit || 0);
+  if (adminEdits.waterIncluded !== undefined) updatedData.waterIncluded = adminEdits.waterIncluded;
+  if (adminEdits.electricityIncluded !== undefined) updatedData.electricityIncluded = adminEdits.electricityIncluded;
+  if (adminEdits.availableFrom !== undefined) updatedData.availableFrom = adminEdits.availableFrom;
+  if (adminEdits.bedrooms !== undefined) updatedData.bedrooms = Number(adminEdits.bedrooms);
+  if (adminEdits.bathrooms !== undefined) updatedData.bathrooms = Number(adminEdits.bathrooms);
+  if (adminEdits.description !== undefined) updatedData.description = adminEdits.description.trim();
+  if (adminEdits.contactPhone !== undefined) updatedData.contactPhone = adminEdits.contactPhone.trim();
+  if (adminEdits.contactWhatsApp !== undefined) updatedData.contactWhatsApp = adminEdits.contactWhatsApp.trim();
+
+  await updateDoc(doc(db, LISTINGS_COLLECTION, listingId), updatedData);
 }
 
 export async function rejectListing(listingId, adminNote, currentUser) {
